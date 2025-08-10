@@ -7,19 +7,19 @@ export default function Feeds() {
   const [articles, setArticles] = useState([])
   const [loading, setLoading] = useState(false)
 
-  // --- ajout d’un flux (statut + fréquence) ---
+  // --- ajout d’un flux (statut + fréquence + tags CSV) ---
   const [url, setUrl] = useState('')
   const [statusNew, setStatusNew] = useState('active')   // active | inactive
   const [freqNew, setFreqNew] = useState('hourly')       // hourly | 6h | daily
+  const [tagsNew, setTagsNew] = useState('')             // CSV -> array
 
   // --- filtres & recherche ---
-  const [q, setQ] = useState('')           // recherche plein texte
+  const [q, setQ] = useState('')
   const [status, setStatus] = useState('all') // all | read | unread
   const [favorite, setFavorite] = useState(false)
-  const [feedId, setFeedId] = useState('') // filtrage par source
-  const [tags, setTags] = useState('')     // CSV de tags (au niveau feed)
+  const [feedId, setFeedId] = useState('')
+  const [tags, setTags] = useState('') // CSV
 
-  // --- helpers chargement ---
   const loadFeeds = async () => {
     const r = await api.get('/api/feeds')
     setFeeds(r.data)
@@ -49,9 +49,15 @@ export default function Feeds() {
     e.preventDefault()
     const u = url.trim()
     if (!u) return
+    const tagList = tagsNew.split(',').map(s => s.trim()).filter(Boolean)
     setLoading(true)
-    await api.post('/api/feeds', { url: u, status: statusNew, updateFrequency: freqNew })
-    setUrl('')
+    await api.post('/api/feeds', {
+      url: u,
+      status: statusNew,
+      updateFrequency: freqNew,
+      tags: tagList
+    })
+    setUrl(''); setTagsNew('')
     await loadFeeds()
     await loadArticles()
     setLoading(false)
@@ -129,7 +135,7 @@ export default function Feeds() {
       {/* Ajout d’un flux */}
       <form
         onSubmit={addFeed}
-        style={{ display: 'grid', gridTemplateColumns: 'minmax(240px,1fr) 120px 150px auto', gap: 8, marginBottom: 12 }}
+        style={{ display: 'grid', gridTemplateColumns: 'minmax(240px,1fr) 120px 150px minmax(160px,1fr) auto', gap: 8, marginBottom: 12 }}
       >
         <input value={url} onChange={e => setUrl(e.target.value)} placeholder="URL du flux RSS" />
         <select value={statusNew} onChange={e => setStatusNew(e.target.value)}>
@@ -141,6 +147,7 @@ export default function Feeds() {
           <option value="6h">Toutes les 6h</option>
           <option value="daily">Quotidien</option>
         </select>
+        <input value={tagsNew} onChange={e => setTagsNew(e.target.value)} placeholder="Tags (ex: tech,actu)" />
         <button type="submit" disabled={loading}>{loading ? 'Ajout…' : 'Ajouter'}</button>
       </form>
 
@@ -157,6 +164,7 @@ export default function Feeds() {
         {feeds.map(f => (
           <li key={f._id} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
             <b>{f.title || '(Sans titre)'}</b> — <span>{f.url}</span>
+            {!!(f.tags?.length) && <em> — tags: {f.tags.join(', ')}</em>}
             <em> — {f.status}, freq: {f.updateFrequency}</em>
             <button onClick={() => toggleFeedStatus(f)} style={{ marginLeft: 'auto' }}>
               {f.status === 'active' ? 'Désactiver' : 'Activer'}
@@ -196,7 +204,7 @@ export default function Feeds() {
           </select>
         </div>
         <div>
-          <label>Tags (CSV)</label>
+          <label>Tags</label>
           <input value={tags} onChange={e => setTags(e.target.value)} placeholder="ex: tech,actu" />
         </div>
         <button type="submit">Appliquer</button>
