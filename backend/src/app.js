@@ -10,6 +10,11 @@ import feedRoutes from './routes/feeds.js';
 import articleRoutes from './routes/articles.js';
 import collectionRoutes from './routes/collections.js';
 
+import cron from 'node-cron';
+import Feed from './models/Feed.js';
+import Article from './models/Article.js';
+import { fetchFeedArticles } from './utils/rss.js';
+
 dotenv.config();
 const app = express();
 
@@ -30,5 +35,26 @@ app.use('/api/auth', authRoutes);
 app.use('/api/feeds', feedRoutes);
 app.use('/api/articles', articleRoutes);
 app.use('/api/collections', collectionRoutes);
+
+// Toutes les heures
+cron.schedule('0 * * * *', async () => {
+  try {
+    const feeds = await Feed.find({ status: 'active' }).select('_id url');
+    for (const f of feeds) {
+      const meta = await fetchFeedArticles(f.url);
+      const items = meta.items.slice(0, 50);
+      for (const it of items) {
+        await Article.updateOne(
+          { guid: it.link || (it.title + f._id.toString()) },
+          { $setOnInsert: { ...it, guid: it.link || (it.title + f._id.toString()), feed: f._id } },
+          { upsert: true }
+        );
+      }
+    }
+    console.log(`[CRON] Feeds refreshed: ${feeds.length}`);
+  } catch (e) {
+    console.error('[CRON] refresh error', e.message);
+  }
+});
 
 export default app;

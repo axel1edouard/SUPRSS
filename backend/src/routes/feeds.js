@@ -25,7 +25,6 @@ router.post('/', requireAuth, async (req, res) => {
       collection: collectionId || null
     });
 
-    // upsert articles
     const items = meta.items.slice(0, 50);
     for (const it of items) {
       await Article.updateOne(
@@ -57,6 +56,44 @@ router.delete('/:id', requireAuth, async (req, res) => {
   await Article.deleteMany({ feed: feed._id });
   await feed.deleteOne();
   res.json({ ok: true });
+});
+
+// ---------- Export JSON ----------
+router.get('/export/json', requireAuth, async (req, res) => {
+  const feeds = await Feed.find({ owner: req.user.id }).lean();
+  const payload = feeds.map(f => ({
+    title: f.title,
+    url: f.url,
+    description: f.description || '',
+    tags: f.tags || [],
+    updateFrequency: f.updateFrequency || 'hourly',
+    status: f.status || 'active'
+  }));
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="suprss_feeds.json"');
+  res.send(JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), feeds: payload }, null, 2));
+});
+
+// ---------- Import JSON ----------
+router.post('/import/json', requireAuth, async (req, res) => {
+  const { feeds } = req.body || {};
+  if (!Array.isArray(feeds)) return res.status(400).json({ error: 'feeds[] required' });
+  const created = [];
+  for (const f of feeds) {
+    if (!f.url) continue;
+    const meta = await fetchFeedArticles(f.url);
+    const feed = await Feed.create({
+      url: f.url,
+      title: f.title || meta.meta.title || f.url,
+      description: f.description || meta.meta.description || '',
+      tags: f.tags || [],
+      updateFrequency: f.updateFrequency || 'hourly',
+      status: f.status || 'active',
+      owner: req.user.id
+    });
+    created.push(feed);
+  }
+  res.status(201).json({ count: created.length });
 });
 
 export default router;

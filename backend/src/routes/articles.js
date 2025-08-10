@@ -5,31 +5,51 @@ import Feed from '../models/Feed.js';
 
 const router = Router();
 
-// Query params: feedId?, collectionId?, status(read/unread)?, favorite(true)? q?
+// Query: feedId?, collectionId?, status(read|unread)?, favorite(true)? q?, tags? (CSV), limit?
 router.get('/', requireAuth, async (req, res) => {
-  const { feedId, collectionId, status, favorite, q, limit = 50 } = req.query;
+  const { feedId, collectionId, status, favorite, q, tags, limit = 50 } = req.query;
   const filters = {};
   if (feedId) filters.feed = feedId;
   if (q) filters.$text = { $search: q };
 
-  let baseQuery = Article.find(filters).sort({ pubDate: -1 }).limit(Math.min(parseInt(limit) || 50, 200));
+  // Base query
+  let query = Article.find(filters).sort({ pubDate: -1 }).limit(Math.min(parseInt(limit) || 50, 200));
+  let articles = await query.lean();
 
-  let articles = await baseQuery.lean();
-  // Filter by collection by checking the feed
+  // Filter by collection: restrict to its feeds
+  let feedIdsInCollection = null;
   if (collectionId) {
-    const feedIds = (await Feed.find({ collection: collectionId }).select('_id')).map(f => f._id.toString());
-    articles = articles.filter(a => feedIds.includes(a.feed.toString()));
+    const feeds = await Feed.find({ collection: collectionId }).select('_id');
+    feedIdsInCollection = new Set(feeds.map(f => f._id.toString()));
+    articles = articles.filter(a => feedIdsInCollection.has(a.feed.toString()));
   }
-  // Filter read/unread
+
+  // Filter by tags (applied at feed level)
+  if (tags) {
+    const tagList = tags.split(',').map(s => s.trim()).filter(Boolean);
+    if (tagList.length) {
+      const feedQuery = { owner: req.user.id };
+      if (collectionId) feedQuery.collection = collectionId;
+      const feeds = await Feed.find(feedQuery).select('_id tags');
+      const allowed = new Set(
+        feeds.filter(f => (f.tags || []).some(t => tagList.includes(t))).map(f => f._id.toString())
+      );
+      articles = articles.filter(a => allowed.has(a.feed.toString()));
+    }
+  }
+
+  // read/unread
   if (status === 'read') {
     articles = articles.filter(a => (a.readBy || []).some(u => u.toString() === req.user.id));
   } else if (status === 'unread') {
     articles = articles.filter(a => !(a.readBy || []).some(u => u.toString() === req.user.id));
   }
-  // Filter favorite
+
+  // favorite
   if (favorite === 'true') {
     articles = articles.filter(a => (a.favoritedBy || []).some(u => u.toString() === req.user.id));
   }
+
   res.json(articles);
 });
 
