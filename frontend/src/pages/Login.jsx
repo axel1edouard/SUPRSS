@@ -3,8 +3,8 @@ import { useNavigate, Link } from 'react-router-dom'
 import api from '../lib/api'
 
 export default function Login() {
-  const [email, setEmail] = useState('demo@suprss.local')
-  const [password, setPassword] = useState('password123')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
   const navigate = useNavigate()
 
@@ -24,9 +24,20 @@ export default function Login() {
       <h1>Connexion</h1>
       <form onSubmit={submit}>
         <label>Email</label>
-        <input value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%' }} />
+        <input
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          placeholder="votre@email.com"
+          style={{ width: '100%' }}
+        />
         <label>Mot de passe</label>
-        <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%' }} />
+        <input
+          type="password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          placeholder="••••••••"
+          style={{ width: '100%' }}
+        />
         {error && <div style={{ color: 'red' }}>{error}</div>}
         <button type="submit">Se connecter</button>
       </form>

@@ -3,7 +3,7 @@ import api from '../lib/api'
 
 export default function Feeds() {
   const [feeds, setFeeds] = useState([])
-  const [url, setUrl] = useState('https://news.ycombinator.com/rss')
+  const [url, setUrl] = useState('')
   const [articles, setArticles] = useState([])
   const [loading, setLoading] = useState(false)
 
