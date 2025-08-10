@@ -4,21 +4,34 @@ import api from '../lib/api'
 
 export default function App() {
   const [me, setMe] = useState(null)
+  const [authChecked, setAuthChecked] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register'
 
   useEffect(() => {
-    if (isAuthPage) return // ne pas vérifier /me sur login/register
-    api.get('/api/auth/me')
-      .then(r => setMe(r.data))
-      .catch(() => navigate('/login'))
-  }, [isAuthPage])
+    let cancelled = false
+    if (isAuthPage) { setAuthChecked(true); return }
 
-  if (isAuthPage) {
-    // Pas de navbar sur login/register
-    return <Outlet />
-  }
+    (async () => {
+      try {
+        const r = await api.get('/api/auth/me')
+        if (!cancelled) setMe(r.data)
+      } catch {
+        if (!cancelled) navigate('/login', { replace: true })
+      } finally {
+        if (!cancelled) setAuthChecked(true)
+      }
+    })()
+
+    return () => { cancelled = true }
+  }, [isAuthPage, navigate])
+
+  // Pas de navbar ni de vérif sur les pages auth
+  if (isAuthPage) return <Outlet />
+
+  // Empêche Feeds/Collections de se monter avant la vérif => plus de 401 en console
+  if (!authChecked) return null
 
   const logout = async () => {
     await api.post('/api/auth/logout')
