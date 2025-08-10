@@ -1,0 +1,48 @@
+version: "3.9"
+services:
+  mongo:
+    image: mongo:7
+    container_name: suprss_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - suprss_mongo_data:/data/db
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: suprss_backend
+    depends_on:
+      - mongo
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+      - MONGO_URI=mongodb://mongo:27017/suprss
+      - JWT_SECRET=change_me_in_env
+      - FRONTEND_URL=http://localhost:5173
+      - CORS_ORIGIN=http://localhost:5173
+      - COOKIE_NAME=suprss_token
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: suprss_frontend
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_BASE=http://localhost:4000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: ["npm", "run", "dev", "--", "--host"]
+    restart: unless-stopped
+
+volumes:
+  suprss_mongo_data:
