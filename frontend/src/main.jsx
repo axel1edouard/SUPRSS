@@ -7,6 +7,7 @@ import Register from './pages/Register.jsx'
 import Feeds from './pages/Feeds.jsx'
 import Collections from './pages/Collections.jsx'
 import CollectionView from './pages/CollectionView.jsx'
+import AcceptInvite from './pages/AcceptInvite.jsx'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <BrowserRouter>
@@ -18,6 +19,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="feeds" element={<Feeds />} />
         <Route path="collections" element={<Collections />} />
         <Route path="collections/:id" element={<CollectionView />} />
+        <Route path="invite/:token" element={<AcceptInvite />} />
       </Route>
     </Routes>
   </BrowserRouter>
