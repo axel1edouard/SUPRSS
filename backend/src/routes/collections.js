@@ -7,6 +7,7 @@ import Article from '../models/Article.js';
 import User from '../models/User.js';
 import CollectionInvite from '../models/CollectionInvite.js';
 import { fetchFeedArticles } from '../utils/rss.js';
+import Comment from '../models/Comment.js';
 
 const router = Router();
 
@@ -142,6 +143,115 @@ router.get('/:id/articles', requireAuth, async (req, res) => {
   if (favorite === 'true') arts = arts.filter(a => a.isFavorite);
 
   res.json(arts);
+});
+
+/* -------------------- Messagerie de collection (article = null) -------------------- */
+
+// GET messages (polling): ?since=<ISO|ms>&limit=50
+router.get('/:id/messages', requireAuth, async (req, res) => {
+  const col = await ensureMember(req.params.id, req.user.id);
+  if (!col) return res.status(404).json({ error: 'Not found' });
+
+  const { since, limit = 50 } = req.query;
+  const sinceDate = since ? new Date(since) : new Date(0);
+  const lim = Math.min(parseInt(limit) || 50, 200);
+
+  const msgs = await Comment
+    .find({ collection: col._id, article: null, createdAt: { $gt: sinceDate } })
+    .sort({ createdAt: 1 })
+    .limit(lim)
+    .populate('author', 'email')
+    .lean();
+
+  res.json(msgs);
+});
+
+router.post('/:id/messages', requireAuth, async (req, res) => {
+  const col = await ensureMember(req.params.id, req.user.id);
+  if (!col) return res.status(404).json({ error: 'Not found' });
+
+  const content = (req.body?.content || '').trim();
+  if (!content) return res.status(400).json({ error: 'content required' });
+
+  const msg = await Comment.create({
+    collection: col._id,
+    article: null,
+    author: req.user.id,
+    content
+  });
+
+  const withAuthor = await Comment.findById(msg._id).populate('author', 'email').lean();
+  res.status(201).json(withAuthor);
+});
+
+/* -------------------- Commentaires d’un article (dans une collection) -------------------- */
+
+// helper: vérifie que l’article appartient à un feed de la collection
+async function ensureArticleInCollection(articleId, collectionId) {
+  const art = await Article.findById(articleId).select('feed');
+  if (!art) return null;
+  const feed = await Feed.findById(art.feed).select('collection');
+  if (!feed) return null;
+  return String(feed.collection) === String(collectionId) ? art : null;
+}
+
+// GET comments d’un article : ?since=&limit=
+router.get('/:id/articles/:articleId/comments', requireAuth, async (req, res) => {
+  const col = await ensureMember(req.params.id, req.user.id);
+  if (!col) return res.status(404).json({ error: 'Not found' });
+
+  const art = await ensureArticleInCollection(req.params.articleId, col._id);
+  if (!art) return res.status(404).json({ error: 'Article not in collection' });
+
+  const { since, limit = 100 } = req.query;
+  const sinceDate = since ? new Date(since) : new Date(0);
+  const lim = Math.min(parseInt(limit) || 100, 300);
+
+  const items = await Comment
+    .find({ collection: col._id, article: art._id, createdAt: { $gt: sinceDate } })
+    .sort({ createdAt: 1 })
+    .limit(lim)
+    .populate('author', 'email')
+    .lean();
+
+  res.json(items);
+});
+
+router.post('/:id/articles/:articleId/comments', requireAuth, async (req, res) => {
+  const col = await ensureMember(req.params.id, req.user.id);
+  if (!col) return res.status(404).json({ error: 'Not found' });
+
+  const art = await ensureArticleInCollection(req.params.articleId, col._id);
+  if (!art) return res.status(404).json({ error: 'Article not in collection' });
+
+  const content = (req.body?.content || '').trim();
+  if (!content) return res.status(400).json({ error: 'content required' });
+
+  const c = await Comment.create({
+    collection: col._id,
+    article: art._id,
+    author: req.user.id,
+    content
+  });
+
+  const withAuthor = await Comment.findById(c._id).populate('author', 'email').lean();
+  res.status(201).json(withAuthor);
+});
+
+// Suppression d’un message/commentaire (auteur ou owner)
+router.delete('/:id/comments/:commentId', requireAuth, async (req, res) => {
+  const col = await ensureMember(req.params.id, req.user.id);
+  if (!col) return res.status(404).json({ error: 'Not found' });
+
+  const c = await Comment.findById(req.params.commentId);
+  if (!c || String(c.collection) !== String(col._id)) return res.status(404).json({ error: 'Not found' });
+
+  const isOwner = String(col.owner) === String(req.user.id);
+  const isAuthor = String(c.author) === String(req.user.id);
+  if (!isOwner && !isAuthor) return res.status(403).json({ error: 'Forbidden' });
+
+  await c.deleteOne();
+  res.json({ ok: true });
 });
 
 /* -------------------- Membres & invitations -------------------- */

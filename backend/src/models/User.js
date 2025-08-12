@@ -6,9 +6,9 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, index: true },
   passwordHash: { type: String, required: true },
   preferences: {
-    darkMode: { type: Boolean, default: false },
-    fontSize: { type: String, default: 'medium' }
-  }
+  theme: { type: String, enum: ['system', 'light', 'dark'], default: 'system' },
+  fontScale: { type: Number, min: 0.85, max: 1.25, default: 1 }
+},
 }, { timestamps: true });
 
 userSchema.methods.setPassword = async function(password) {

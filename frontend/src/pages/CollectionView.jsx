@@ -1,13 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 
 export default function CollectionView() {
-  // --- HOOKS TOUJOURS AU TOP-LEVEL (même ordre) ---
   const { id } = useParams()
   const navigate = useNavigate()
 
-  // état principal
+  // états principaux
   const [collection, setCollection] = useState(null)
   const [feeds, setFeeds] = useState([])
   const [articles, setArticles] = useState([])
@@ -28,26 +27,32 @@ export default function CollectionView() {
   const [tags, setTags] = useState('')
   const [feedId, setFeedId] = useState('')
 
-  // invitation
+  // invitations
   const [inviteEmail, setInviteEmail] = useState('')
 
-  // mémo pour owner / état utilisateur
-  const owner = useMemo(() => members.find(m => m.role === 'owner') || null, [members])
-  const amOwner = useMemo(
-    () => !!(me && owner && String(owner._id) === String(me._id)),
-    [me, owner]
-  )
-  const amMember = useMemo(
-    () => !!(me && members.some(m => String(m._id) === String(me._id))),
-    [me, members]
-  )
+  // chat
+  const [chat, setChat] = useState([])                // { _id, content, author:{email}, createdAt }
+  const [chatInput, setChatInput] = useState('')
+  const lastChatTsRef = useRef(null)
+  const chatEndRef = useRef(null)
 
-  // chargements
+  // commentaires par article
+  const [openComments, setOpenComments] = useState({})       // { [articleId]: true }
+  const [comments, setComments] = useState({})               // { [articleId]: array }
+  const [commentInputs, setCommentInputs] = useState({})     // { [articleId]: string }
+  const lastCommentTsRef = useRef({})                        // { [articleId]: ISO }
+
+  // mémo owner / état
+  const owner = useMemo(() => members.find(m => m.role === 'owner') || null, [members])
+  const amOwner = useMemo(() => !!(me && owner && String(owner._id) === String(me._id)), [me, owner])
+  const amMember = useMemo(() => !!(me && members.some(m => String(m._id) === String(me._id))), [me, members])
+
+  // loaders
   const loadMe = async () => { try { const r = await api.get('/api/auth/me'); setMe(r.data) } catch {} }
   const loadCollection = async () => { const r = await api.get(`/api/collections/${id}`); setCollection(r.data) }
   const loadFeeds = async () => {
     try {
-      const r = await api.get('/api/feeds')            // robuste: on filtre côté client
+      const r = await api.get('/api/feeds')
       setFeeds((r.data || []).filter(f => f.collection && String(f.collection) === String(id)))
     } catch { setFeeds([]) }
   }
@@ -71,17 +76,82 @@ export default function CollectionView() {
     } catch { setMembers([]); setInvites([]) }
   }
 
+  // chat
+  const loadChat = async (initial = false) => {
+    try {
+      const since = initial ? '' : (lastChatTsRef.current || '')
+      const url = since ? `/api/collections/${id}/messages?since=${encodeURIComponent(since)}` : `/api/collections/${id}/messages`
+      const r = await api.get(url)
+      if (Array.isArray(r.data) && r.data.length) {
+        setChat(prev => [...prev, ...r.data])
+        lastChatTsRef.current = r.data[r.data.length - 1].createdAt
+      } else if (initial) {
+        setChat([]); lastChatTsRef.current = null
+      }
+    } catch { /* ignore */ }
+  }
+  const sendChat = async (e) => {
+    e?.preventDefault()
+    const content = chatInput.trim()
+    if (!content) return
+    const r = await api.post(`/api/collections/${id}/messages`, { content })
+    setChat(prev => [...prev, r.data])
+    lastChatTsRef.current = r.data.createdAt
+    setChatInput('')
+    // scroll bas
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 0)
+  }
+
+  // commentaires
+  const loadCommentsFor = async (articleId, initial = false) => {
+    try {
+      const since = initial ? '' : (lastCommentTsRef.current[articleId] || '')
+      const url = since
+        ? `/api/collections/${id}/articles/${articleId}/comments?since=${encodeURIComponent(since)}`
+        : `/api/collections/${id}/articles/${articleId}/comments`
+      const r = await api.get(url)
+      if (Array.isArray(r.data) && r.data.length) {
+        setComments(prev => ({ ...prev, [articleId]: [...(prev[articleId] || []), ...r.data] }))
+        lastCommentTsRef.current[articleId] = r.data[r.data.length - 1].createdAt
+      } else if (initial) {
+        setComments(prev => ({ ...prev, [articleId]: [] }))
+        lastCommentTsRef.current[articleId] = null
+      }
+    } catch { /* ignore */ }
+  }
+  const sendComment = async (articleId, e) => {
+    e?.preventDefault()
+    const content = (commentInputs[articleId] || '').trim()
+    if (!content) return
+    const r = await api.post(`/api/collections/${id}/articles/${articleId}/comments`, { content })
+    setComments(prev => ({ ...prev, [articleId]: [...(prev[articleId] || []), r.data] }))
+    lastCommentTsRef.current[articleId] = r.data.createdAt
+    setCommentInputs(prev => ({ ...prev, [articleId]: '' }))
+  }
+  const deleteComment = async (commentId) => {
+    if (!confirm('Supprimer ce message ?')) return
+    await api.delete(`/api/collections/${id}/comments/${commentId}`)
+    // purge locale
+    setChat(prev => prev.filter(m => m._id !== commentId))
+    setComments(prev => {
+      const obj = { ...prev }
+      Object.keys(obj).forEach(k => obj[k] = obj[k].filter(c => c._id !== commentId))
+      return obj
+    })
+  }
+
   useEffect(() => {
-    // un seul useEffect pour garder l’ordre de hooks identique
     loadMe()
     loadCollection()
     loadFeeds()
     loadArticles()
     loadMembers()
+    loadChat(true)
+    const int = setInterval(() => loadChat(false), 4000)
+    return () => clearInterval(int)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  // actions
   const addFeed = async (e) => {
     e.preventDefault()
     const u = url.trim(); if (!u) return
@@ -102,15 +172,8 @@ export default function CollectionView() {
   }
 
   const applyFilters = async (e) => { e?.preventDefault(); await loadArticles() }
-
-  const toggleRead = async (a) => {
-    await api.post(`/api/articles/${a._id}/${a.isRead ? 'mark-unread' : 'mark-read'}`)
-    await loadArticles()
-  }
-  const toggleFavorite = async (a) => {
-    await api.post(`/api/articles/${a._id}/${a.isFavorite ? 'unfavorite' : 'favorite'}`)
-    await loadArticles()
-  }
+  const toggleRead = async (a) => { await api.post(`/api/articles/${a._id}/${a.isRead ? 'mark-unread' : 'mark-read'}`); await loadArticles() }
+  const toggleFavorite = async (a) => { await api.post(`/api/articles/${a._id}/${a.isFavorite ? 'unfavorite' : 'favorite'}`); await loadArticles() }
 
   const sendInvite = async (e) => {
     e.preventDefault()
@@ -126,14 +189,12 @@ export default function CollectionView() {
     await api.delete(`/api/collections/${id}/members/${userId}`)
     await loadMembers()
   }
-
   const leaveCollection = async () => {
     if (!confirm('Quitter cette collection ?')) return
     await api.post(`/api/collections/${id}/leave`)
     navigate('/collections')
   }
 
-  // rendu
   if (!collection) return <div style={{ padding: 16 }}>Chargement…</div>
 
   return (
@@ -141,11 +202,10 @@ export default function CollectionView() {
       <h2>Collection — {collection.name}</h2>
       {collection.description && <p>{collection.description}</p>}
 
+      {/* Membres */}
       <h3>Membres</h3>
       {(!amOwner && amMember) && (
-        <button onClick={leaveCollection} style={{ margin: '8px 0' }}>
-          Quitter la collection
-        </button>
+        <button onClick={leaveCollection} style={{ margin: '8px 0' }}>Quitter la collection</button>
       )}
       <ul>
         {members.map(m => (
@@ -158,7 +218,6 @@ export default function CollectionView() {
           </li>
         ))}
       </ul>
-
       {invites.length > 0 && (
         <>
           <h4>Invitations en attente</h4>
@@ -171,7 +230,6 @@ export default function CollectionView() {
           </ul>
         </>
       )}
-
       {amOwner && (
         <form onSubmit={sendInvite} style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
           <input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="email@exemple.com" />
@@ -179,6 +237,7 @@ export default function CollectionView() {
         </form>
       )}
 
+      {/* Ajout feed */}
       <form
         onSubmit={addFeed}
         style={{ display: 'grid', gridTemplateColumns: 'minmax(240px,1fr) 120px 150px minmax(160px,1fr) auto', gap: 8, marginBottom: 12 }}
@@ -197,6 +256,7 @@ export default function CollectionView() {
         <button type="submit">Ajouter</button>
       </form>
 
+      {/* Feeds */}
       <h3>Feeds de la collection</h3>
       <ul>
         {feeds.map(f => (
@@ -204,12 +264,41 @@ export default function CollectionView() {
             <b>{f.title || '(Sans titre)'}</b> — <span>{f.url}</span>
             {!!(f.tags?.length) && <em> — tags: {f.tags.join(', ')}</em>}
             <em> — {f.status}, freq: {f.updateFrequency}</em>
+            {f.lastFetchedAt && (
+              <span style={{ fontSize: 12, color: '#666' }}>
+                {' '}— maj: {new Date(f.lastFetchedAt).toLocaleString()}
+              </span>
+            )}
             <button onClick={() => removeFeed(f._id)} style={{ marginLeft: 'auto' }}>Retirer</button>
+            <button onClick={async () => { await api.post('/api/feeds/' + f._id + '/refresh'); await loadFeeds(); await loadArticles(); }}>
+              Rafraîchir
+            </button>
           </li>
         ))}
         {feeds.length === 0 && <li>Aucun flux dans cette collection pour l’instant.</li>}
       </ul>
 
+      {/* Chat de collection */}
+      <h3 style={{ marginTop: 24 }}>Discussions de la collection</h3>
+      <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 8, maxHeight: 280, overflowY: 'auto', background: '#fafafa' }}>
+        {chat.map(m => (
+          <div key={m._id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '4px 0' }}>
+            <strong>{m.author?.email || '—'}</strong>
+            <span style={{ fontSize: 12, color: '#666' }}>{new Date(m.createdAt).toLocaleString()}</span>
+            <span style={{ marginLeft: 6 }}>{m.content}</span>
+            {(amOwner || (me && m.author && String(m.author._id || '') === String(me._id))) && (
+              <button onClick={() => deleteComment(m._id)} style={{ marginLeft: 'auto' }}>Supprimer</button>
+            )}
+          </div>
+        ))}
+        <div ref={chatEndRef} />
+      </div>
+      <form onSubmit={sendChat} style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Écrire un message…" />
+        <button type="submit">Envoyer</button>
+      </form>
+
+      {/* Filtres articles */}
       <h3 style={{ marginTop: 24 }}>Articles de la collection</h3>
       <form
         onSubmit={applyFilters}
@@ -245,22 +334,53 @@ export default function CollectionView() {
         <button type="submit">Appliquer</button>
       </form>
 
+      {/* Articles + commentaires */}
       <ul>
-        {articles.map(a => (
-          <li key={a._id} style={{ marginBottom: 12 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <a href={a.link} target="_blank" rel="noreferrer">{a.title}</a>
-              {a.isRead && <span style={{ fontSize: 12, color: '#555', border: '1px solid #ccc', padding: '0 6px', borderRadius: 12 }}>Lu</span>}
-              {a.isFavorite && <span style={{ fontSize: 12, color: '#b35', border: '1px solid #e3c', padding: '0 6px', borderRadius: 12 }}>Favori</span>}
-            </div>
-            {a.pubDate && <span> — {new Date(a.pubDate).toLocaleString()}</span>}
-            <div>{a.summary?.slice(0, 160)}</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => toggleRead(a)}>{a.isRead ? 'Marquer non lu' : 'Marquer lu'}</button>
-              <button onClick={() => toggleFavorite(a)}>{a.isFavorite ? 'Retirer favori' : 'Favori'}</button>
-            </div>
-          </li>
-        ))}
+        {articles.map(a => {
+          const opened = !!openComments[a._id]
+          const list = comments[a._id] || []
+          return (
+            <li key={a._id} style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <a href={a.link} target="_blank" rel="noreferrer">{a.title}</a>
+                {a.isRead && <span style={{ fontSize: 12, color: '#555', border: '1px solid #ccc', padding: '0 6px', borderRadius: 12 }}>Lu</span>}
+                {a.isFavorite && <span style={{ fontSize: 12, color: '#b35', border: '1px solid #e3c', padding: '0 6px', borderRadius: 12 }}>Favori</span>}
+                <button onClick={() => { setOpenComments(prev => ({ ...prev, [a._id]: !opened })); if (!opened) loadCommentsFor(a._id, true) }} style={{ marginLeft: 'auto' }}>
+                  {opened ? 'Masquer commentaires' : 'Commentaires'}
+                </button>
+              </div>
+              {a.pubDate && <span> — {new Date(a.pubDate).toLocaleString()}</span>}
+              <div>{a.summary?.slice(0, 160)}</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => toggleRead(a)}>{a.isRead ? 'Marquer non lu' : 'Marquer lu'}</button>
+                <button onClick={() => toggleFavorite(a)}>{a.isFavorite ? 'Retirer favori' : 'Favori'}</button>
+              </div>
+
+              {opened && (
+                <div style={{ marginTop: 8, borderLeft: '3px solid #ddd', paddingLeft: 8 }}>
+                  {list.map(c => (
+                    <div key={c._id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '4px 0' }}>
+                      <strong>{c.author?.email || '—'}</strong>
+                      <span style={{ fontSize: 12, color: '#666' }}>{new Date(c.createdAt).toLocaleString()}</span>
+                      <span style={{ marginLeft: 6 }}>{c.content}</span>
+                      {(amOwner || (me && c.author && String(c.author._id || '') === String(me._id))) && (
+                        <button onClick={() => deleteComment(c._id)} style={{ marginLeft: 'auto' }}>Supprimer</button>
+                      )}
+                    </div>
+                  ))}
+                  <form onSubmit={(e) => sendComment(a._id, e)} style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                    <input
+                      value={commentInputs[a._id] || ''}
+                      onChange={e => setCommentInputs(prev => ({ ...prev, [a._id]: e.target.value }))}
+                      placeholder="Écrire un commentaire…"
+                    />
+                    <button type="submit">Envoyer</button>
+                  </form>
+                </div>
+              )}
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

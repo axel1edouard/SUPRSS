@@ -4,8 +4,13 @@ import Feed from '../models/Feed.js';
 import Article from '../models/Article.js';
 import { fetchFeedArticles } from '../utils/rss.js';
 import { XMLParser } from 'fast-xml-parser';
+import { refreshFeed } from '../utils/scheduler.js';
 
 const router = Router();
+
+function escapeXml(s='') {
+  return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
 // Create a feed and ingest articles
 router.post('/', requireAuth, async (req, res) => {
@@ -16,23 +21,28 @@ router.post('/', requireAuth, async (req, res) => {
     const meta = await fetchFeedArticles(url);
     const feed = await Feed.create({
       url,
-      title: title || meta.meta.title || url,
-      description: description || meta.meta.description || '',
+      title: title || meta.meta?.title || url,
+      description: description || meta.meta?.description || '',
       tags: tags || [],
-      updateFrequency: updateFrequency || 'hourly', // 'hourly' | '6h' | 'daily'
-      status: status || 'active',                   // 'active'  | 'inactive'
+      updateFrequency: updateFrequency || 'hourly',
+      status: status || 'active',
       owner: req.user.id,
-      collection: collectionId || null
+      collection: collectionId || null,
+      lastFetchedAt: new Date(),
+      etag: meta.etag || null,
+      lastModified: meta.lastModified || null
     });
 
-    const items = meta.items.slice(0, 50);
+    const items = (meta.items || []).slice(0, 50);
     for (const it of items) {
+      const guid = it.guid || it.link || (it.title + feed._id.toString());
       await Article.updateOne(
-        { guid: it.link || (it.title + feed._id.toString()) },
-        { $setOnInsert: { ...it, guid: it.link || (it.title + feed._id.toString()), feed: feed._id } },
+        { guid, feed: feed._id },
+        { $setOnInsert: { ...it, guid, feed: feed._id } },
         { upsert: true }
       );
     }
+
     res.status(201).json(feed);
   } catch (e) {
     console.error(e);
@@ -49,17 +59,30 @@ router.get('/', requireAuth, async (req, res) => {
   res.json(feeds);
 });
 
-// Update feed (status, frequency, title, tags)
+// Update feed (status, frequency, title, tags, detach/attach collection)
 router.patch('/:id', requireAuth, async (req, res) => {
   const feed = await Feed.findOne({ _id: req.params.id, owner: req.user.id });
   if (!feed) return res.status(404).json({ error: 'Not found' });
-  const { title, tags, updateFrequency, status } = req.body || {};
+
+  const { title, tags, updateFrequency, status, collection } = req.body || {};
   if (title !== undefined) feed.title = title;
   if (Array.isArray(tags)) feed.tags = tags;
   if (['hourly','6h','daily'].includes(updateFrequency)) feed.updateFrequency = updateFrequency;
   if (['active','inactive'].includes(status)) feed.status = status;
+  if (collection === null) feed.collection = null;
+  if (typeof collection === 'string') feed.collection = collection;
+
   await feed.save();
   res.json(feed);
+});
+
+// Manual refresh
+router.post('/:id/refresh', requireAuth, async (req, res) => {
+  const feed = await Feed.findOne({ _id: req.params.id, owner: req.user.id });
+  if (!feed) return res.status(404).json({ error: 'Not found' });
+  const result = await refreshFeed(feed);
+  const fresh = await Feed.findById(feed._id);
+  res.json({ ...result, feed: fresh });
 });
 
 // Delete feed and its articles
@@ -71,7 +94,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-// ---------- Export JSON (déjà présent) ----------
+/* ---------- Export JSON ---------- */
 router.get('/export/json', requireAuth, async (req, res) => {
   const feeds = await Feed.find({ owner: req.user.id }).lean();
   const payload = feeds.map(f => ({
@@ -83,7 +106,7 @@ router.get('/export/json', requireAuth, async (req, res) => {
   res.send(JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), feeds: payload }, null, 2));
 });
 
-// ---------- Import JSON (déjà présent) ----------
+/* ---------- Import JSON ---------- */
 router.post('/import/json', requireAuth, async (req, res) => {
   const { feeds } = req.body || {};
   if (!Array.isArray(feeds)) return res.status(400).json({ error: 'feeds[] required' });
@@ -93,19 +116,22 @@ router.post('/import/json', requireAuth, async (req, res) => {
     const meta = await fetchFeedArticles(f.url);
     await Feed.create({
       url: f.url,
-      title: f.title || meta.meta.title || f.url,
-      description: f.description || meta.meta.description || '',
+      title: f.title || meta.meta?.title || f.url,
+      description: f.description || meta.meta?.description || '',
       tags: f.tags || [],
       updateFrequency: f.updateFrequency || 'hourly',
       status: f.status || 'active',
-      owner: req.user.id
+      owner: req.user.id,
+      lastFetchedAt: new Date(),
+      etag: meta.etag || null,
+      lastModified: meta.lastModified || null
     });
     count++;
   }
   res.status(201).json({ count });
 });
 
-// ---------- Export OPML ----------
+/* ---------- Export OPML ---------- */
 router.get('/export/opml', requireAuth, async (req, res) => {
   const feeds = await Feed.find({ owner: req.user.id }).lean();
   const outlines = feeds.map(f =>
@@ -125,11 +151,8 @@ router.get('/export/opml', requireAuth, async (req, res) => {
   res.setHeader('Content-Disposition', 'attachment; filename="suprss_feeds.opml"');
   res.send(opml);
 });
-function escapeXml(s='') {
-  return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
 
-// ---------- Import OPML ----------
+/* ---------- Import OPML ---------- */
 router.post('/import/opml', requireAuth, async (req, res) => {
   const { opml } = req.body || {};
   if (!opml || typeof opml !== 'string') return res.status(400).json({ error: 'opml string required' });
@@ -155,12 +178,15 @@ router.post('/import/opml', requireAuth, async (req, res) => {
       const meta = await fetchFeedArticles(url);
       await Feed.create({
         url,
-        title: meta.meta.title || url,
-        description: meta.meta.description || '',
+        title: meta.meta?.title || url,
+        description: meta.meta?.description || '',
         tags: [],
         updateFrequency: 'hourly',
         status: 'active',
-        owner: req.user.id
+        owner: req.user.id,
+        lastFetchedAt: new Date(),
+        etag: meta.etag || null,
+        lastModified: meta.lastModified || null
       });
       count++;
     } catch { /* ignore */ }

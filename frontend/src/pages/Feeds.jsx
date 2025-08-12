@@ -166,8 +166,16 @@ export default function Feeds() {
             <b>{f.title || '(Sans titre)'}</b> — <span>{f.url}</span>
             {!!(f.tags?.length) && <em> — tags: {f.tags.join(', ')}</em>}
             <em> — {f.status}, freq: {f.updateFrequency}</em>
+            {f.lastFetchedAt && (
+              <span style={{ fontSize: 12, color: '#666' }}>
+                {' '}— maj: {new Date(f.lastFetchedAt).toLocaleString()}
+              </span>
+            )}
             <button onClick={() => toggleFeedStatus(f)} style={{ marginLeft: 'auto' }}>
               {f.status === 'active' ? 'Désactiver' : 'Activer'}
+            </button>
+            <button onClick={async () => { await api.post('/api/feeds/' + f._id + '/refresh'); await loadFeeds(); await loadArticles(); }}>
+              Rafraîchir
             </button>
             <button onClick={() => removeFeed(f._id)}>Supprimer</button>
           </li>

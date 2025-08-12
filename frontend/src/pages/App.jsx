@@ -1,51 +1,45 @@
 import React, { useEffect, useState } from 'react'
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import api from '../lib/api'
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import api from '../lib/api'  // <-- si App.jsx est dans src/pages ; sinon "./lib/api"
 
 export default function App() {
-  const [me, setMe] = useState(null)
-  const [authChecked, setAuthChecked] = useState(false)
-  const navigate = useNavigate()
   const location = useLocation()
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/register'
+  const navigate = useNavigate()
+  const [me, setMe] = useState(null)
+
+  // Cacher la nav sur /login et /register
+  const hideNav = location.pathname.startsWith('/login') || location.pathname.startsWith('/register')
 
   useEffect(() => {
-    let cancelled = false
-    if (isAuthPage) { setAuthChecked(true); return }
-
-    (async () => {
+    if (hideNav) return
+    ;(async () => {
       try {
         const r = await api.get('/api/auth/me')
-        if (!cancelled) setMe(r.data)
+        setMe(r.data)
       } catch {
-        if (!cancelled) navigate('/login', { replace: true })
-      } finally {
-        if (!cancelled) setAuthChecked(true)
+        setMe(null)
       }
     })()
-
-    return () => { cancelled = true }
-  }, [isAuthPage, navigate])
-
-  // Pas de navbar ni de vérif sur les pages auth
-  if (isAuthPage) return <Outlet />
-
-  // Empêche Feeds/Collections de se monter avant la vérif => plus de 401 en console
-  if (!authChecked) return null
+  }, [hideNav])
 
   const logout = async () => {
-    await api.post('/api/auth/logout')
+    try { await api.post('/api/auth/logout') } catch {}
+    setMe(null)
     navigate('/login')
   }
 
   return (
-    <div style={{ fontFamily: 'system-ui', maxWidth: 980, margin: '0 auto', padding: 16 }}>
-      <nav style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
-        <Link to="/feeds">Feeds</Link>
-        <Link to="/collections">Collections</Link>
-        <div style={{ marginLeft: 'auto' }}>{me?.email}</div>
-        <button onClick={logout}>Déconnexion</button>
-      </nav>
+    <div className="app-shell">
+      {!hideNav && (
+        <nav className="topbar">
+          <NavLink to="/feeds" className={({isActive}) => isActive ? 'active' : ''}>Mes flux</NavLink>
+          <NavLink to="/collections" className={({isActive}) => isActive ? 'active' : ''}>Collections</NavLink>
+          <NavLink to="/settings" className={({isActive}) => isActive ? 'active' : ''}>Paramètres</NavLink>
+          <div className="spacer" />
+          {me && <span className="user-email">{me.email}</span>}
+          <button onClick={logout}>Déconnexion</button>
+        </nav>
+      )}
       <Outlet />
     </div>
   )

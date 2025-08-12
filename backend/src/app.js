@@ -9,11 +9,14 @@ import authRoutes from './routes/auth.js';
 import feedRoutes from './routes/feeds.js';
 import articleRoutes from './routes/articles.js';
 import collectionRoutes from './routes/collections.js';
+import userRoutes from './routes/user.js';
 
 import cron from 'node-cron';
 import Feed from './models/Feed.js';
 import Article from './models/Article.js';
 import { fetchFeedArticles } from './utils/rss.js';
+
+import { startScheduler } from './utils/scheduler.js';
 
 dotenv.config();
 const app = express();
@@ -35,6 +38,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/feeds', feedRoutes);
 app.use('/api/articles', articleRoutes);
 app.use('/api/collections', collectionRoutes);
+app.use('/api/user', userRoutes);
 
 // Toutes les heures
 cron.schedule('0 * * * *', async () => {
@@ -56,5 +60,9 @@ cron.schedule('0 * * * *', async () => {
     console.error('[CRON] refresh error', e.message);
   }
 });
+
+if (process.env.SCHEDULER_ENABLED !== 'false') {
+  startScheduler();
+}
 
 export default app;
