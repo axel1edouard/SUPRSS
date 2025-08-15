@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
-import App from './pages/App.jsx'          // ou './App.jsx' si tu l’as à la racine
+import App from './pages/App.jsx'
 import './index.css'
 import { loadAndApplyPrefs } from './lib/prefs.js'
 
@@ -14,20 +14,32 @@ import Register from './pages/Register.jsx'
 import Settings from './pages/Settings.jsx'
 import AcceptInvite from './pages/AcceptInvite.jsx'
 
+import RequireAuth from './components/RequireAuth.jsx'
+import HomeRedirect from './components/HomeRedirect.jsx'
+
 function Root() {
   useEffect(() => { loadAndApplyPrefs() }, [])
+
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<App />}>
-          <Route index element={<Navigate to="/feeds" replace />} />
-          <Route path="feeds" element={<Feeds />} />
-          <Route path="collections" element={<Collections />} />
-          <Route path="collections/:id" element={<CollectionView />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="invite/:token" element={<AcceptInvite />} />
+          {/* racine : si connecté -> /feeds, sinon -> /login */}
+          <Route index element={<HomeRedirect />} />
+
+          {/* privées */}
+          <Route path="feeds" element={<RequireAuth><Feeds /></RequireAuth>} />
+          <Route path="collections" element={<RequireAuth><Collections /></RequireAuth>} />
+          <Route path="collections/:id" element={<RequireAuth><CollectionView /></RequireAuth>} />
+          <Route path="settings" element={<RequireAuth><Settings /></RequireAuth>} />
+
+          {/* publiques */}
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
+          <Route path="invite/:token" element={<AcceptInvite />} />
+
+          {/* fallback */}
+          <Route path="*" element={<HomeRedirect />} />
         </Route>
       </Routes>
     </BrowserRouter>

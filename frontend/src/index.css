@@ -1,65 +1,69 @@
-:root {
-  --bg: #ffffff;
-  --text: #111111;
-  --muted: #666666;
-  --card: #f7f7f7;
-  --border: #e6e6e6;
-  --accent: #2563eb;
-  --font-scale: 1;
+:root{
+  --bg:#ffffff; --text:#111; --muted:#666; --card:#f7f7f7; --border:#e6e6e6; --accent:#2563eb;
+  --ok:#16a34a; --warn:#ca8a04; --danger:#dc2626;
+  --shadow:0 1px 0 rgba(0,0,0,.03);
+  --font-scale:1;
 }
-
-html[data-theme="dark"] {
-  --bg: #0b0b0d;
-  --text: #e9e9ee;
-  --muted: #a3a3ad;
-  --card: #15151a;
-  --border: #23232a;
-  --accent: #60a5fa;
+html[data-theme="dark"]{
+  --bg:#0b0b0d; --text:#e9e9ee; --muted:#a3a3ad; --card:#15151a; --border:#23232a; --accent:#60a5fa;
+  --shadow:0 1px 0 rgba(0,0,0,.25);
 }
-
-html {
-  background: var(--bg);
-  color: var(--text);
-  font-size: calc(16px * var(--font-scale));
+html{ background:var(--bg); color:var(--text); font-size:calc(16px * var(--font-scale)); }
+a{ color:var(--accent); text-decoration:none; }
+a:hover{ text-decoration:underline; }
+h1,h2,h3,h4{ margin:16px 0 8px; }
+label{ display:block; font-size:.95rem; color:var(--muted); margin-bottom:4px; }
+input,select,button,textarea{
+  background:var(--card); color:var(--text); border:1px solid var(--border);
+  border-radius:10px; padding:8px 10px;
 }
+button{ cursor:pointer; }
+.user-email{ font-size:.9rem; color:var(--muted); margin-right:8px; }
 
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
-
-input, select, button, textarea {
-  background: var(--card);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
+/* Layout */
+.app-shell{ max-width:1100px; margin:0 auto; padding:16px; }
+.topbar{
+  display:flex; gap:12px; align-items:center; padding:10px 12px; border:1px solid var(--border);
+  border-radius:12px; background:var(--card); margin-bottom:16px; box-shadow:var(--shadow);
 }
-button { cursor: pointer; }
-h1, h2, h3, h4 { margin: 16px 0 8px; }
-ul { padding-left: 18px; }
-label { display:block; font-size: .95rem; color: var(--muted); margin-bottom: 4px; }
+.topbar a{ padding:6px 8px; border-radius:8px; }
+.topbar a.active{ background:var(--border); text-decoration:none; }
+.spacer{ flex:1; }
 
-/* Layout simple */
-.app-shell {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 16px;
+/* Cards for lists */
+ul.cards{ list-style:none; padding:0; margin:0; }
+ul.cards>li{
+  background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px;
+  margin:10px 0; box-shadow:var(--shadow); display:block;
 }
-.topbar {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--card);
-  margin-bottom: 16px;
-}
-.topbar a { padding: 6px 8px; border-radius: 6px; }
-.topbar a.active {
-  background: var(--border);
-  text-decoration: none;
-}
-.spacer { flex: 1; }
+.card-row{ display:flex; gap:8px; align-items:center; }
+.card-actions{ display:flex; gap:8px; margin-top:8px; }
 
-.user-email { font-size: .9rem; color: var(--muted); margin-right: 8px; }
+/* Buttons */
+.btn{ border:1px solid var(--border); background:var(--card); }
+.btn.primary{ background:var(--accent); color:white; border-color:transparent; }
+.btn.ghost{ background:transparent; }
+.btn.danger{ border-color:var(--danger); color:var(--danger); }
+.btn.small{ padding:6px 8px; border-radius:8px; }
 
+/* Badges */
+.badge{ font-size:.75rem; padding:2px 8px; border:1px solid var(--border); border-radius:999px; color:var(--muted); }
+.badge.ok{ border-color:var(--ok); color:var(--ok); }
+.badge.fav{ border-color:#e879f9; color:#e879f9; }
+
+/* Toasts */
+#toast-root{ position:fixed; right:12px; bottom:12px; display:flex; flex-direction:column; gap:8px; z-index:9999; }
+.toast{
+  background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px 12px;
+  box-shadow:var(--shadow); transform:translateY(8px); opacity:0; transition:.25s;
+}
+.toast.show{ transform:translateY(0); opacity:1; }
+.toast.success{ border-color:var(--ok); }
+.toast.error{ border-color:var(--danger); }
+
+/* Spinner */
+.spinner{
+  width:18px; height:18px; border:2px solid var(--border); border-top-color:var(--accent);
+  border-radius:50%; animation:spin 1s linear infinite;
+}
+@keyframes spin{ to{ transform:rotate(360deg) } }

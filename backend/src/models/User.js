@@ -1,23 +1,45 @@
+// backend/src/models/User.js
 import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
+const { Schema } = mongoose;
 
-const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true, index: true },
-  passwordHash: { type: String, required: true },
-  preferences: {
-  theme: { type: String, enum: ['system', 'light', 'dark'], default: 'system' },
-  fontScale: { type: Number, min: 0.85, max: 1.25, default: 1 }
-},
-}, { timestamps: true });
+const UserSchema = new Schema(
+  {
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      index: true,
+      trim: true,
+    },
 
-userSchema.methods.setPassword = async function(password) {
-  const salt = await bcrypt.genSalt(10);
-  this.passwordHash = await bcrypt.hash(password, salt);
-};
+    // Nom facultatif (on peut le remplir via Google)
+    name: { type: String, default: '' },
 
-userSchema.methods.validatePassword = async function(password) {
-  return bcrypt.compare(password, this.passwordHash);
-};
+    // Hash de mot de passe requis SEULEMENT si pas d'OAuth
+    passwordHash: {
+      type: String,
+      default: null,
+      required: function () {
+        // si pas de GoogleId => compte "classique" => mot de passe requis
+        return !this.googleId;
+      },
+    },
 
-export default mongoose.model('User', userSchema);
+    // Lien vers un compte Google
+    googleId: {
+      type: String,
+      default: null,
+      unique: true,
+      sparse: true, // permet plusieurs docs sans googleId
+      index: true,
+    },
+
+    createdAt: { type: Date, default: Date.now },
+  },
+  {
+    versionKey: false,
+  }
+);
+
+export default mongoose.model('User', UserSchema);

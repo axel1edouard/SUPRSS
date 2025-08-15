@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import api from '../lib/api'
+import { toast } from '../lib/toast'
 
 export default function Feeds() {
   // --- état Feeds / Articles ---
@@ -7,7 +8,7 @@ export default function Feeds() {
   const [articles, setArticles] = useState([])
   const [loading, setLoading] = useState(false)
 
-  // --- ajout d’un flux (statut + fréquence + tags CSV) ---
+  // --- ajout d’un flux (statut + fréquence + tags) ---
   const [url, setUrl] = useState('')
   const [statusNew, setStatusNew] = useState('active')   // active | inactive
   const [freqNew, setFreqNew] = useState('hourly')       // hourly | 6h | daily
@@ -50,29 +51,45 @@ export default function Feeds() {
     const u = url.trim()
     if (!u) return
     const tagList = tagsNew.split(',').map(s => s.trim()).filter(Boolean)
-    setLoading(true)
-    await api.post('/api/feeds', {
-      url: u,
-      status: statusNew,
-      updateFrequency: freqNew,
-      tags: tagList
-    })
-    setUrl(''); setTagsNew('')
-    await loadFeeds()
-    await loadArticles()
-    setLoading(false)
+    try {
+      setLoading(true)
+      await api.post('/api/feeds', {
+        url: u,
+        status: statusNew,
+        updateFrequency: freqNew,
+        tags: tagList
+      })
+      setUrl(''); setTagsNew('')
+      await loadFeeds()
+      await loadArticles()
+      toast('Flux ajouté ✅')
+    } catch {
+      toast('Échec ajout du flux', 'error')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const removeFeed = async (id) => {
-    await api.delete('/api/feeds/' + id)
-    await loadFeeds()
-    await loadArticles()
+    try {
+      await api.delete('/api/feeds/' + id)
+      await loadFeeds()
+      await loadArticles()
+      toast('Flux supprimé')
+    } catch {
+      toast('Suppression impossible', 'error')
+    }
   }
 
   const toggleFeedStatus = async (f) => {
-    const next = f.status === 'active' ? 'inactive' : 'active'
-    await api.patch('/api/feeds/' + f._id, { status: next })
-    await loadFeeds()
+    try {
+      const next = f.status === 'active' ? 'inactive' : 'active'
+      await api.patch('/api/feeds/' + f._id, { status: next })
+      await loadFeeds()
+      toast(next === 'active' ? 'Flux activé' : 'Flux désactivé')
+    } catch {
+      toast('Mise à jour du statut impossible', 'error')
+    }
   }
 
   // --- toggles article ---
@@ -99,11 +116,14 @@ export default function Feeds() {
     const input = document.createElement('input')
     input.type = 'file'; input.accept = 'application/json'
     input.onchange = async () => {
-      const text = await input.files[0].text()
-      const json = JSON.parse(text)
-      const feeds = Array.isArray(json.feeds) ? json.feeds : json
-      await api.post('/api/feeds/import/json', { feeds })
-      await loadFeeds(); await loadArticles()
+      try {
+        const text = await input.files[0].text()
+        const json = JSON.parse(text)
+        const feeds = Array.isArray(json.feeds) ? json.feeds : json
+        await api.post('/api/feeds/import/json', { feeds })
+        await loadFeeds(); await loadArticles()
+        toast('Import JSON effectué')
+      } catch { toast('Import JSON invalide', 'error') }
     }
     input.click()
   }
@@ -120,9 +140,12 @@ export default function Feeds() {
     const input = document.createElement('input')
     input.type = 'file'; input.accept = '.opml, .xml, text/xml, application/xml'
     input.onchange = async () => {
-      const text = await input.files[0].text()
-      await api.post('/api/feeds/import/opml', { opml: text })
-      await loadFeeds(); await loadArticles()
+      try {
+        const text = await input.files[0].text()
+        await api.post('/api/feeds/import/opml', { opml: text })
+        await loadFeeds(); await loadArticles()
+        toast('Import OPML effectué')
+      } catch { toast('Import OPML invalide', 'error') }
     }
     input.click()
   }
@@ -148,36 +171,40 @@ export default function Feeds() {
           <option value="daily">Quotidien</option>
         </select>
         <input value={tagsNew} onChange={e => setTagsNew(e.target.value)} placeholder="Tags (ex: tech,actu)" />
-        <button type="submit" disabled={loading}>{loading ? 'Ajout…' : 'Ajouter'}</button>
+        <button className="btn primary" type="submit" disabled={loading}>{loading ? 'Ajout…' : 'Ajouter'}</button>
       </form>
 
       {/* Export / Import */}
       <div style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
-        <button onClick={exportJson}>Exporter JSON</button>
-        <button onClick={importJson}>Importer JSON</button>
-        <button onClick={exportOpml}>Exporter OPML</button>
-        <button onClick={importOpml}>Importer OPML</button>
+        <button className="btn" onClick={exportJson}>Exporter JSON</button>
+        <button className="btn" onClick={importJson}>Importer JSON</button>
+        <button className="btn" onClick={exportOpml}>Exporter OPML</button>
+        <button className="btn" onClick={importOpml}>Importer OPML</button>
       </div>
 
       {/* Liste des flux */}
-      <ul>
+      <ul className="cards">
         {feeds.map(f => (
-          <li key={f._id} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
-            <b>{f.title || '(Sans titre)'}</b> — <span>{f.url}</span>
-            {!!(f.tags?.length) && <em> — tags: {f.tags.join(', ')}</em>}
-            <em> — {f.status}, freq: {f.updateFrequency}</em>
-            {f.lastFetchedAt && (
-              <span style={{ fontSize: 12, color: '#666' }}>
-                {' '}— maj: {new Date(f.lastFetchedAt).toLocaleString()}
-              </span>
-            )}
-            <button onClick={() => toggleFeedStatus(f)} style={{ marginLeft: 'auto' }}>
-              {f.status === 'active' ? 'Désactiver' : 'Activer'}
-            </button>
-            <button onClick={async () => { await api.post('/api/feeds/' + f._id + '/refresh'); await loadFeeds(); await loadArticles(); }}>
-              Rafraîchir
-            </button>
-            <button onClick={() => removeFeed(f._id)}>Supprimer</button>
+          <li key={f._id}>
+            <div className="card-row">
+              <b>{f.title || '(Sans titre)'}</b> — <span>{f.url}</span>
+              {!!(f.tags?.length) && <em> — tags: {f.tags.join(', ')}</em>}
+              <em> — {f.status}, freq: {f.updateFrequency}</em>
+              {f.lastFetchedAt && (
+                <span className="badge"> maj: {new Date(f.lastFetchedAt).toLocaleString()}</span>
+              )}
+              <button className="btn ghost small" onClick={() => toggleFeedStatus(f)} style={{ marginLeft: 'auto' }}>
+                {f.status === 'active' ? 'Désactiver' : 'Activer'}
+              </button>
+              <button className="btn primary small" onClick={async () => {
+                await api.post('/api/feeds/' + f._id + '/refresh')
+                await loadFeeds(); await loadArticles()
+                toast('Flux rafraîchi ✅')
+              }}>
+                Rafraîchir
+              </button>
+              <button className="btn danger small" onClick={() => removeFeed(f._id)}>Supprimer</button>
+            </div>
           </li>
         ))}
       </ul>
@@ -215,25 +242,25 @@ export default function Feeds() {
           <label>Tags</label>
           <input value={tags} onChange={e => setTags(e.target.value)} placeholder="ex: tech,actu" />
         </div>
-        <button type="submit">Appliquer</button>
+        <button className="btn" type="submit">Appliquer</button>
       </form>
 
       {/* Articles */}
       <h2>Articles</h2>
-      <ul>
+      <ul className="cards">
         {articles.map(a => (
-          <li key={a._id} style={{ marginBottom: 12 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <li key={a._id}>
+            <div className="card-row">
               <a href={a.link} target="_blank" rel="noreferrer">{a.title}</a>
-              {a.isRead && <span style={{ fontSize: 12, color: '#555', border: '1px solid #ccc', padding: '0 6px', borderRadius: 12 }}>Lu</span>}
-              {a.isFavorite && <span style={{ fontSize: 12, color: '#b35', border: '1px solid #e3c', padding: '0 6px', borderRadius: 12 }}>Favori</span>}
+              {a.isRead && <span className="badge ok">Lu</span>}
+              {a.isFavorite && <span className="badge fav">Favori</span>}
             </div>
             {a.author && <span> — {a.author}</span>}
             {a.pubDate && <span> — {new Date(a.pubDate).toLocaleString()}</span>}
             <div>{a.summary?.slice(0, 160)}</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => toggleRead(a)}>{a.isRead ? 'Marquer non lu' : 'Marquer lu'}</button>
-              <button onClick={() => toggleFavorite(a)}>{a.isFavorite ? 'Retirer favori' : 'Favori'}</button>
+            <div className="card-actions">
+              <button className="btn small" onClick={() => toggleRead(a)}>{a.isRead ? 'Marquer non lu' : 'Marquer lu'}</button>
+              <button className="btn small" onClick={() => toggleFavorite(a)}>{a.isFavorite ? 'Retirer favori' : 'Favori'}</button>
             </div>
           </li>
         ))}

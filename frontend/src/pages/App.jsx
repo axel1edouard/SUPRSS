@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import api from '../lib/api'  // <-- si App.jsx est dans src/pages ; sinon "./lib/api"
+import api from '../lib/api'
 
 export default function App() {
   const location = useLocation()
@@ -25,7 +25,7 @@ export default function App() {
   const logout = async () => {
     try { await api.post('/api/auth/logout') } catch {}
     setMe(null)
-    navigate('/login')
+    navigate('/login', { replace: true })
   }
 
   return (

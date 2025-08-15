@@ -18,6 +18,11 @@ export default function Login() {
       setError('Identifiants invalides')
     }
   }
+// construit l’URL OAuth à partir de la base de l’API
+  const oauthGoogle = () => {
+    const base = (api.defaults.baseURL || '').replace(/\/$/, '')
+    window.location.href = base + '/api/auth/google'
+  }
 
   return (
     <div style={{ maxWidth: 420, margin: '10vh auto' }}>
@@ -41,6 +46,10 @@ export default function Login() {
         {error && <div style={{ color: 'red' }}>{error}</div>}
         <button type="submit">Se connecter</button>
       </form>
+      <div style={{ margin: '12px 0', textAlign: 'center', color: 'var(--muted)' }}>— ou —</div>
+      <button className="btn" onClick={oauthGoogle} style={{ width: '100%' }}>
+        Continuer avec Google
+      </button>
       <p>Pas de compte ? <Link to="/register">Créer un compte</Link></p>
     </div>
   )

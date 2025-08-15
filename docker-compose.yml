@@ -22,6 +22,9 @@ services:
       - FRONTEND_URL=http://localhost:5173
       - CORS_ORIGIN=http://localhost:5173
       - COOKIE_NAME=suprss_token
+      - GOOGLE_CLIENT_ID=815392111720-u7dhbo27e9sll1cjuvke9m1n7g6vmon3.apps.googleusercontent.com
+      - GOOGLE_CLIENT_SECRET=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
+      - OAUTH_GOOGLE_CALLBACK_URL=http://localhost:4000/api/auth/google/callback
     ports:
       - "4000:4000"
     restart: unless-stopped
