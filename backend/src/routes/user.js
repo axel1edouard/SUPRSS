@@ -1,29 +1,39 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
 import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 
 const router = Router();
 
 // Lire préférences
-router.get('/prefs', requireAuth, async (req, res) => {
-  const u = await User.findById(req.user.id).select('preferences').lean();
-  res.json(u?.preferences || { theme: 'system', fontScale: 1 });
+router.get('/prefs', requireAuth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id).select('prefs.theme prefs.fontScale');
+    const theme = user?.prefs?.theme === 'dark' ? 'dark' : 'light';
+    const fontScale = Number(user?.prefs?.fontScale ?? 1);
+    res.json({ ok: true, prefs: { theme, fontScale } });
+  } catch (e) { next(e); }
 });
 
+async function savePrefsFor(userId, body) {
+  const theme = body?.theme === 'dark' ? 'dark' : 'light';
+  const fsRaw = Number(body?.fontScale ?? 1);
+  const fontScale = Math.min(1.5, Math.max(0.8, Number.isNaN(fsRaw) ? 1 : fsRaw));
+  await User.updateOne(
+    { _id: userId },
+    { $set: { 'prefs.theme': theme, 'prefs.fontScale': fontScale } },
+    { upsert: false }
+  );
+  return { theme, fontScale };
+}
+
 // Mettre à jour préférences
-router.patch('/prefs', requireAuth, async (req, res) => {
-  const theme = req.body?.theme;
-  const fontScale = req.body?.fontScale;
-  const update = {};
-  if (['system','light','dark'].includes(theme)) update['preferences.theme'] = theme;
-  if (typeof fontScale === 'number' && fontScale >= 0.85 && fontScale <= 1.25) {
-    update['preferences.fontScale'] = fontScale;
-  }
-  if (!Object.keys(update).length) return res.status(400).json({ error: 'invalid payload' });
-  await User.updateOne({ _id: req.user.id }, { $set: update });
-  const u = await User.findById(req.user.id).select('preferences').lean();
-  res.json(u.preferences);
+router.patch('/prefs', requireAuth, async (req, res, next) => {
+  try {
+    const prefs = await savePrefsFor(req.user.id, req.body);
+    res.json({ ok: true, prefs });
+  } catch (e) { next(e); }
 });
 
 // Changer le mot de passe

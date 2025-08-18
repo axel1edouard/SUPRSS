@@ -35,11 +35,17 @@ const UserSchema = new Schema(
       index: true,
     },
 
+    prefs: {
+    theme: { type: String, enum: ['light', 'dark'], default: 'light' },
+    fontScale: { type: Number, default: 1 },
+  },
+
     createdAt: { type: Date, default: Date.now },
   },
   {
     versionKey: false,
   }
+
 );
 
 export default mongoose.model('User', UserSchema);

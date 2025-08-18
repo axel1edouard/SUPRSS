@@ -61,7 +61,7 @@ app.use('/api/articles', articleRoutes);
 app.use('/api/collections', collectionRoutes);
 app.use('/api/user', userRoutes);
 
-// ---- CRON simple horaire (tu as déjà le scheduler plus fin, je garde ton bloc) ----
+// ---- CRON simple horaire ----
 cron.schedule('0 * * * *', async () => {
   try {
     const feeds = await Feed.find({ status: 'active' }).select('_id url');

@@ -1,44 +1,43 @@
-import React, { useEffect, useState } from 'react'
-import api from '../lib/api'
-import { applyPrefs } from '../lib/prefs'
+// frontend/src/pages/Settings.jsx
+import { useEffect, useState } from 'react';
+import api from '../lib/api';
+import { applyPrefs, loadAndApplyPrefs, savePrefs } from '../lib/prefs';
+import { toast } from '../lib/toast';
 
 export default function Settings() {
-  const [theme, setTheme] = useState('system')
-  const [fontScale, setFontScale] = useState(1)
-  const [oldPw, setOldPw] = useState('')
-  const [newPw, setNewPw] = useState('')
-  const [msg, setMsg] = useState('')
+  const [theme, setTheme] = useState('light');     // 'light' | 'dark'
+  const [fontScale, setFontScale] = useState(1);
+  const [oldPw, setOldPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [msg, setMsg] = useState('');
 
   useEffect(() => {
-    (async () => {
-      try {
-        const r = await api.get('/api/user/prefs')
-        setTheme(r.data.theme || 'system')
-        setFontScale(r.data.fontScale || 1)
-      } catch {}
-    })()
-  }, [])
+    loadAndApplyPrefs()
+      .then(p => { setTheme(p.theme); setFontScale(p.fontScale); })
+      .catch(() => {});
+  }, []);
 
-  const savePrefs = async (e) => {
-    e.preventDefault()
-    const payload = { theme, fontScale: Number(fontScale) }
-    const r = await api.patch('/api/user/prefs', payload)
-    applyPrefs(r.data)
-    setMsg('Préférences enregistrées ✅')
-    setTimeout(() => setMsg(''), 2000)
+  async function onSavePrefs(e) {
+    e.preventDefault();
+    const applied = await savePrefs({ theme, fontScale });
+    setTheme(applied.theme);
+    setFontScale(applied.fontScale);
+    setMsg('Préférences enregistrées ✅');
+    toast?.('Préférences enregistrées');
+    setTimeout(() => setMsg(''), 2000);
   }
 
-  const changePassword = async (e) => {
-    e.preventDefault()
-    if (!oldPw || !newPw) return
+  async function changePassword(e) {
+    e.preventDefault();
+    if (!oldPw || !newPw) return;
     try {
-      await api.post('/api/user/change-password', { oldPassword: oldPw, newPassword: newPw })
-      setOldPw(''); setNewPw('')
-      setMsg('Mot de passe changé ✅')
-      setTimeout(() => setMsg(''), 2000)
-    } catch (e) {
-      setMsg("Échec du changement de mot de passe ❌")
-      setTimeout(() => setMsg(''), 2500)
+      await api.post('/api/user/change-password', { oldPassword: oldPw, newPassword: newPw });
+      setOldPw(''); setNewPw('');
+      setMsg('Mot de passe changé ✅');
+    } catch {
+      setMsg('Échec du changement de mot de passe ❌');
+    } finally {
+      setTimeout(() => setMsg(''), 2500);
     }
   }
 
@@ -47,11 +46,10 @@ export default function Settings() {
       <h2>Paramètres</h2>
       {msg && <div style={{ margin: '8px 0', color: 'var(--accent)' }}>{msg}</div>}
 
-      <form onSubmit={savePrefs} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
+      <form onSubmit={onSavePrefs} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
         <div>
           <label>Thème</label>
           <select value={theme} onChange={e => setTheme(e.target.value)}>
-            <option value="system">Système</option>
             <option value="light">Clair</option>
             <option value="dark">Sombre</option>
           </select>
@@ -65,10 +63,10 @@ export default function Settings() {
             max="1.25"
             step="0.05"
             value={fontScale}
-            onChange={e => setFontScale(e.target.value)}
+            onChange={e => setFontScale(parseFloat(e.target.value))}
           />
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-            {Math.round(fontScale * 100)}%
+            {Math.round(Number(fontScale) * 100)}%
           </div>
         </div>
 
@@ -88,5 +86,5 @@ export default function Settings() {
         <button type="submit">Changer le mot de passe</button>
       </form>
     </div>
-  )
+  );
 }
