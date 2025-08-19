@@ -1,154 +1,214 @@
-import React, { useEffect, useState } from 'react'
-import api from '../lib/api'
-import { toast } from '../lib/toast'
+import React, { useEffect, useState, useMemo } from 'react';
+import api from '../lib/api';
+import { toast } from '../lib/toast';
+import ArticleCard from '../components/ArticleCard'; 
 
 export default function Feeds() {
   // --- état Feeds / Articles ---
-  const [feeds, setFeeds] = useState([])
-  const [articles, setArticles] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [feeds, setFeeds] = useState([]);
+  const [articles, setArticles] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // --- ajout d’un flux (statut + fréquence + tags) ---
-  const [url, setUrl] = useState('')
-  const [statusNew, setStatusNew] = useState('active')   // active | inactive
-  const [freqNew, setFreqNew] = useState('hourly')       // hourly | 6h | daily
-  const [tagsNew, setTagsNew] = useState('')             // CSV -> array
+  const [url, setUrl] = useState('');
+  const [statusNew, setStatusNew] = useState('active');   // active | inactive
+  const [freqNew, setFreqNew] = useState('hourly');       // hourly | 6h | daily
+  const [tagsNew, setTagsNew] = useState('');             // CSV -> array
 
   // --- filtres & recherche ---
-  const [q, setQ] = useState('')
-  const [status, setStatus] = useState('all') // all | read | unread
-  const [favorite, setFavorite] = useState(false)
-  const [feedId, setFeedId] = useState('')
-  const [tags, setTags] = useState('') // CSV
+  const [q, setQ] = useState('');
+  const [status, setStatus] = useState('all'); // all | read | unread
+  const [favorite, setFavorite] = useState(false);
+  const [feedId, setFeedId] = useState('');
+  const [tags, setTags] = useState(''); // CSV
 
+  // --- helpers ---
+  const feedTitleById = useMemo(() => {
+    const map = new Map();
+    feeds.forEach(f => map.set(String(f._id), f.title || f.url));
+    return map;
+  }, [feeds]);
+
+  const firstImgFromHTML = (html) => {
+    if (!html) return null;
+    const s = String(html);
+    // src=… ou data-src=…
+    const m = s.match(/<img[^>]+(?:data-src|src)=["']([^"']+)["']/i);
+    return m ? m[1] : null;
+  };
+
+  const resolveUrl = (maybeUrl, base) => {
+    try { return new URL(maybeUrl, base).toString(); } catch { return maybeUrl || null; }
+  };
+
+   const toCardArticle = (a) => {
+    const href = a.link || a.url || '#';
+    const contentObj = (a.content && typeof a.content === 'object') ? a.content : null;
+    const contentHtml = contentObj?.html || a.content_html || a['content:encoded'] || a.content || a.summary || a.description;
+    const enclosure0 = Array.isArray(a.enclosures) ? a.enclosures[0] : null;
+
+    const rawImage =
+      a.imageUrl ||
+      a.image?.url || a.image ||
+      a.cover_image || a.cover ||
+      a.thumbnail || a.thumb ||
+      a.media?.thumbnail?.url || a['media:thumbnail']?.url ||
+      a.media?.content?.url || a['media:content']?.url ||
+      (a.enclosure && typeof a.enclosure === 'object' ? a.enclosure.url : null) ||
+      (enclosure0 && typeof enclosure0 === 'object' ? enclosure0.url : null) ||
+      firstImgFromHTML(contentHtml) ||
+      null;
+
+    const imageUrl = resolveUrl(rawImage, href);
+    const excerpt = a.summary || a.description || '';
+    const source = a.feedTitle || feedTitleById.get(String(a.feedId)) || '';
+    const publishedAt = a.pubDate || a.publishedAt || a.date;
+    const tags = Array.isArray(a.tags) ? a.tags : [];
+    return {
+      id: a._id || a.id || href,
+      title: a.title || '(Sans titre)',
+      imageUrl,
+      href,
+      excerpt,
+      source,
+      publishedAt,
+      tags,
+      _raw: a, // on garde l’objet brut pour les actions (lu/fav)
+    };
+  };
+
+  // --- chargement ---
   const loadFeeds = async () => {
-    const r = await api.get('/api/feeds')
-    setFeeds(r.data)
-  }
+    const r = await api.get('/api/feeds');
+    setFeeds(r.data || []);
+  };
 
   const loadArticles = async () => {
-    const params = new URLSearchParams()
-    if (q) params.append('q', q)
-    if (status !== 'all') params.append('status', status)
-    if (favorite) params.append('favorite', 'true')
-    if (feedId) params.append('feedId', feedId)
-    if (tags) params.append('tags', tags)
-    params.append('limit', '50')
-    const r = await api.get('/api/articles?' + params.toString())
-    setArticles(r.data)
-  }
+    const params = new URLSearchParams();
+    if (q) params.append('q', q);
+    if (status !== 'all') params.append('status', status);
+    if (favorite) params.append('favorite', 'true');
+    if (feedId) params.append('feedId', feedId);
+    if (tags) params.append('tags', tags);
+    params.append('limit', '50');
+    const r = await api.get('/api/articles?' + params.toString());
+    setArticles(r.data || []);
+  };
 
-  useEffect(() => { loadFeeds(); loadArticles() }, [])
+  useEffect(() => {
+    loadFeeds();
+    loadArticles();
+  }, []);
 
   const applyFilters = async (e) => {
-    e?.preventDefault()
-    await loadArticles()
-  }
+    e?.preventDefault();
+    await loadArticles();
+  };
 
   // --- CRUD flux ---
   const addFeed = async (e) => {
-    e.preventDefault()
-    const u = url.trim()
-    if (!u) return
-    const tagList = tagsNew.split(',').map(s => s.trim()).filter(Boolean)
+    e.preventDefault();
+    const u = url.trim();
+    if (!u) return;
+    const tagList = tagsNew.split(',').map(s => s.trim()).filter(Boolean);
     try {
-      setLoading(true)
+      setLoading(true);
       await api.post('/api/feeds', {
         url: u,
         status: statusNew,
         updateFrequency: freqNew,
         tags: tagList
-      })
-      setUrl(''); setTagsNew('')
-      await loadFeeds()
-      await loadArticles()
-      toast('Flux ajouté ✅')
+      });
+      setUrl(''); setTagsNew('');
+      await loadFeeds();
+      await loadArticles();
+      toast('Flux ajouté ✅');
     } catch {
-      toast('Échec ajout du flux', 'error')
+      toast('Échec ajout du flux', 'error');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const removeFeed = async (id) => {
     try {
-      await api.delete('/api/feeds/' + id)
-      await loadFeeds()
-      await loadArticles()
-      toast('Flux supprimé')
+      await api.delete('/api/feeds/' + id);
+      await loadFeeds();
+      await loadArticles();
+      toast('Flux supprimé');
     } catch {
-      toast('Suppression impossible', 'error')
+      toast('Suppression impossible', 'error');
     }
-  }
+  };
 
   const toggleFeedStatus = async (f) => {
     try {
-      const next = f.status === 'active' ? 'inactive' : 'active'
-      await api.patch('/api/feeds/' + f._id, { status: next })
-      await loadFeeds()
-      toast(next === 'active' ? 'Flux activé' : 'Flux désactivé')
+      const next = f.status === 'active' ? 'inactive' : 'active';
+      await api.patch('/api/feeds/' + f._id, { status: next });
+      await loadFeeds();
+      toast(next === 'active' ? 'Flux activé' : 'Flux désactivé');
     } catch {
-      toast('Mise à jour du statut impossible', 'error')
+      toast('Mise à jour du statut impossible', 'error');
     }
-  }
+  };
 
-  // --- toggles article ---
+  // --- actions article ---
   const toggleRead = async (a) => {
-    await api.post(`/api/articles/${a._id}/${a.isRead ? 'mark-unread' : 'mark-read'}`)
-    await loadArticles()
-  }
+    await api.post(`/api/articles/${a._id}/${a.isRead ? 'mark-unread' : 'mark-read'}`);
+    await loadArticles();
+  };
 
   const toggleFavorite = async (a) => {
-    await api.post(`/api/articles/${a._id}/${a.isFavorite ? 'unfavorite' : 'favorite'}`)
-    await loadArticles()
-  }
+    await api.post(`/api/articles/${a._id}/${a.isFavorite ? 'unfavorite' : 'favorite'}`);
+    await loadArticles();
+  };
 
   // --- Export / Import ---
   const exportJson = async () => {
-    const r = await api.get('/api/feeds/export/json', { responseType: 'blob' })
-    const url = window.URL.createObjectURL(new Blob([r.data]))
-    const a = document.createElement('a')
-    a.href = url; a.download = 'suprss_feeds.json'; a.click()
-    window.URL.revokeObjectURL(url)
-  }
+    const r = await api.get('/api/feeds/export/json', { responseType: 'blob' });
+    const url = window.URL.createObjectURL(new Blob([r.data]));
+    const a = document.createElement('a');
+    a.href = url; a.download = 'suprss_feeds.json'; a.click();
+    window.URL.revokeObjectURL(url);
+  };
 
   const importJson = async () => {
-    const input = document.createElement('input')
-    input.type = 'file'; input.accept = 'application/json'
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'application/json';
     input.onchange = async () => {
       try {
-        const text = await input.files[0].text()
-        const json = JSON.parse(text)
-        const feeds = Array.isArray(json.feeds) ? json.feeds : json
-        await api.post('/api/feeds/import/json', { feeds })
-        await loadFeeds(); await loadArticles()
-        toast('Import JSON effectué')
-      } catch { toast('Import JSON invalide', 'error') }
-    }
-    input.click()
-  }
+        const text = await input.files[0].text();
+        const json = JSON.parse(text);
+        const feeds = Array.isArray(json.feeds) ? json.feeds : json;
+        await api.post('/api/feeds/import/json', { feeds });
+        await loadFeeds(); await loadArticles();
+        toast('Import JSON effectué');
+      } catch { toast('Import JSON invalide', 'error'); }
+    };
+    input.click();
+  };
 
   const exportOpml = async () => {
-    const r = await api.get('/api/feeds/export/opml', { responseType: 'blob' })
-    const url = window.URL.createObjectURL(new Blob([r.data]))
-    const a = document.createElement('a')
-    a.href = url; a.download = 'suprss_feeds.opml'; a.click()
-    window.URL.revokeObjectURL(url)
-  }
+    const r = await api.get('/api/feeds/export/opml', { responseType: 'blob' });
+    const url = window.URL.createObjectURL(new Blob([r.data]));
+    const a = document.createElement('a');
+    a.href = url; a.download = 'suprss_feeds.opml'; a.click();
+    window.URL.revokeObjectURL(url);
+  };
 
   const importOpml = async () => {
-    const input = document.createElement('input')
-    input.type = 'file'; input.accept = '.opml, .xml, text/xml, application/xml'
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.opml, .xml, text/xml, application/xml';
     input.onchange = async () => {
       try {
-        const text = await input.files[0].text()
-        await api.post('/api/feeds/import/opml', { opml: text })
-        await loadFeeds(); await loadArticles()
-        toast('Import OPML effectué')
-      } catch { toast('Import OPML invalide', 'error') }
-    }
-    input.click()
-  }
+        const text = await input.files[0].text();
+        await api.post('/api/feeds/import/opml', { opml: text });
+        await loadFeeds(); await loadArticles();
+        toast('Import OPML effectué');
+      } catch { toast('Import OPML invalide', 'error'); }
+    };
+    input.click();
+  };
 
   // --- UI ---
   return (
@@ -197,9 +257,9 @@ export default function Feeds() {
                 {f.status === 'active' ? 'Désactiver' : 'Activer'}
               </button>
               <button className="btn primary small" onClick={async () => {
-                await api.post('/api/feeds/' + f._id + '/refresh')
-                await loadFeeds(); await loadArticles()
-                toast('Flux rafraîchi ✅')
+                await api.post('/api/feeds/' + f._id + '/refresh');
+                await loadFeeds(); await loadArticles();
+                toast('Flux rafraîchi ✅');
               }}>
                 Rafraîchir
               </button>
@@ -235,7 +295,7 @@ export default function Feeds() {
           <label>Source (flux)</label>
           <select value={feedId} onChange={e => setFeedId(e.target.value)}>
             <option value="">Tous</option>
-            {feeds.map(f => <option key={f._id} value={f._id}>{f.title}</option>)}
+            {feeds.map(f => <option key={f._id} value={f._id}>{f.title || f.url}</option>)}
           </select>
         </div>
         <div>
@@ -245,26 +305,30 @@ export default function Feeds() {
         <button className="btn" type="submit">Appliquer</button>
       </form>
 
-      {/* Articles */}
+      {/* Articles en vignettes */}
       <h2>Articles</h2>
-      <ul className="cards">
-        {articles.map(a => (
-          <li key={a._id}>
-            <div className="card-row">
-              <a href={a.link} target="_blank" rel="noreferrer">{a.title}</a>
-              {a.isRead && <span className="badge ok">Lu</span>}
-              {a.isFavorite && <span className="badge fav">Favori</span>}
+      <div
+        className="article-grid"
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}
+      >
+        {articles.map((a) => {
+          const card = toCardArticle(a);
+          return (
+            <div key={card.id} style={{ display: 'grid', gap: 8 }}>
+              <ArticleCard article={card} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn small" onClick={() => toggleRead(card._raw)}>
+                  {a.isRead ? 'Marquer non lu' : 'Marquer lu'}
+                </button>
+                <button className="btn small" onClick={() => toggleFavorite(card._raw)}>
+                  {a.isFavorite ? 'Retirer favori' : 'Favori'}
+                </button>
+              </div>
             </div>
-            {a.author && <span> — {a.author}</span>}
-            {a.pubDate && <span> — {new Date(a.pubDate).toLocaleString()}</span>}
-            <div>{a.summary?.slice(0, 160)}</div>
-            <div className="card-actions">
-              <button className="btn small" onClick={() => toggleRead(a)}>{a.isRead ? 'Marquer non lu' : 'Marquer lu'}</button>
-              <button className="btn small" onClick={() => toggleFavorite(a)}>{a.isFavorite ? 'Retirer favori' : 'Favori'}</button>
-            </div>
-          </li>
-        ))}
-      </ul>
+          );
+        })}
+        {!articles.length && <div className="muted">Aucun article pour le moment.</div>}
+      </div>
     </div>
-  )
+  );
 }

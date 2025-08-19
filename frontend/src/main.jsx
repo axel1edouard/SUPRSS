@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { RouterProvider } from 'react-router-dom';
+import { router } from './router';
 
 import App from './pages/App.jsx'
 import './index.css'
@@ -48,6 +50,6 @@ function Root() {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <Root />
+    <RouterProvider router={router} />
   </React.StrictMode>
 )

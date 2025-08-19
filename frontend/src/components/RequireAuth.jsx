@@ -1,19 +1,26 @@
-import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import api from '../lib/api'
+// frontend/src/components/RequireAuth.jsx
+import { useEffect, useState } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import api from '../lib/api';
 
 export default function RequireAuth({ children }) {
-  const nav = useNavigate()
-  const [ok, setOk] = useState(false)
+  const [ok, setOk] = useState(null); // null = loading
+  const location = useLocation();
 
   useEffect(() => {
-    let alive = true
+    let mounted = true;
     api.get('/api/auth/me')
-      .then(() => alive && setOk(true))
-      .catch(() => alive && nav('/login', { replace: true }))
-    return () => { alive = false }
-  }, [nav])
+      .then(r => {
+        if (!mounted) return;
+        const u = r?.data?.user ?? r?.data ?? null;
+        const has = u && (u.id || u._id || u.email);
+        setOk(!!has);
+      })
+      .catch(() => { if (mounted) setOk(false); });
+    return () => { mounted = false; };
+  }, [location.pathname]);
 
-  if (!ok) return null
-  return children
+  if (ok === null) return null; // spinner si tu veux
+  if (!ok) return <Navigate to="/login" replace state={{ from: location }} />;
+  return children;
 }
