@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 import ArticleCard from '../components/ArticleCard'; 
@@ -36,6 +36,8 @@ export default function Feeds() {
     const m = s.match(/<img[^>]+(?:data-src|src)=["']([^"']+)["']/i);
     return m ? m[1] : null;
   };
+
+  const menuRef = useRef(null);
 
   const resolveUrl = (maybeUrl, base) => {
     try { return new URL(maybeUrl, base).toString(); } catch { return maybeUrl || null; }
@@ -170,6 +172,7 @@ export default function Feeds() {
     const a = document.createElement('a');
     a.href = url; a.download = 'suprss_feeds.json'; a.click();
     window.URL.revokeObjectURL(url);
+    menuRef.current?.removeAttribute('open');
   };
 
   const importJson = async () => {
@@ -184,6 +187,7 @@ export default function Feeds() {
         await loadFeeds(); await loadArticles();
         toast('Import JSON effectué');
       } catch { toast('Import JSON invalide', 'error'); }
+      menuRef.current?.removeAttribute('open');
     };
     input.click();
   };
@@ -194,6 +198,7 @@ export default function Feeds() {
     const a = document.createElement('a');
     a.href = url; a.download = 'suprss_feeds.opml'; a.click();
     window.URL.revokeObjectURL(url);
+    menuRef.current?.removeAttribute('open');
   };
 
   const importOpml = async () => {
@@ -206,6 +211,7 @@ export default function Feeds() {
         await loadFeeds(); await loadArticles();
         toast('Import OPML effectué');
       } catch { toast('Import OPML invalide', 'error'); }
+      menuRef.current?.removeAttribute('open');
     };
     input.click();
   };
@@ -234,13 +240,17 @@ export default function Feeds() {
         <button className="btn primary" type="submit" disabled={loading}>{loading ? 'Ajout…' : 'Ajouter'}</button>
       </form>
 
-      {/* Export / Import */}
-      <div style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
-        <button className="btn" onClick={exportJson}>Exporter JSON</button>
-        <button className="btn" onClick={importJson}>Importer JSON</button>
-        <button className="btn" onClick={exportOpml}>Exporter OPML</button>
-        <button className="btn" onClick={importOpml}>Importer OPML</button>
-      </div>
+      {/* Import / Export (menu) */}
+ <details ref={menuRef} className="menu" style={{ margin: '12px 0' }}>
+   <summary className="btn">Import / Export ▾</summary>
+   <div className="menu__list">
+     <button type="button" className="menu__item" onClick={exportJson}>Exporter JSON</button>
+     <button type="button" className="menu__item" onClick={importJson}>Importer JSON</button>
+     <hr className="menu__sep" />
+     <button type="button" className="menu__item" onClick={exportOpml}>Exporter OPML</button>
+     <button type="button" className="menu__item" onClick={importOpml}>Importer OPML</button>
+   </div>
+ </details>
 
       {/* Liste des flux */}
       <ul className="cards">

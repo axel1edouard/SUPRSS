@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import api from '../lib/api';
 import { loadAndApplyPrefs } from '../lib/prefs';
+import { ButterflyLogo } from '../components/Logo';
 
 function extractUser(resp) {
   // tolère de nombreuses formes: {user:{...}} ou {...} direct
@@ -60,7 +61,10 @@ export default function App() {
     <div className="app-shell">
       {!hideHeader && (
         <header className="toolbar" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
-          <Link to="/" className="brand" style={{ fontWeight: 700, textDecoration: 'none', color: 'inherit' }}>🦋 SUPRSS</Link>
+          <div className="brand" aria-label="SUPRSS" style={{ display:'flex', alignItems:'center', gap:8 }}>
+   <ButterflyLogo size={20} />
+   <span style={{ fontWeight: 700, letterSpacing: .2 }}>SUPRSS</span>
+ </div>
 
           <nav style={{ display: 'flex', gap: 10 }}>
             <NavLink to="/feeds" className={({isActive}) => isActive ? 'link active' : 'link'}>Articles</NavLink>

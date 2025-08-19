@@ -162,3 +162,30 @@ ul.cards>li{
 .article-card__tags{ margin-top: 8px; display:flex; gap:6px; flex-wrap:wrap; }
 .tag{ background: transparent; border:1px dashed var(--border); color: var(--muted); padding:2px 8px; border-radius:999px; font-size:12px; }
 
+/* --- Brand (logo + texte) --- */
+.brand svg { display:block; }
+
+/* --- Menu déroulant --- */
+.menu{ position: relative; display:inline-block; }
+.menu > summary { list-style: none; cursor: pointer; }
+.menu > summary::-webkit-details-marker { display:none; }
+
+.menu__list{
+  position: absolute; z-index: 10; min-width: 220px;
+  margin-top: 8px; padding: 6px;
+  background: var(--card); border:1px solid var(--border); border-radius: 10px;
+  box-shadow: var(--shadow-md);
+  display: none;
+}
+.menu[open] > .menu__list{ display:block; }
+
+.menu__item{
+  width: 100%; text-align: left; padding: 8px 10px; border-radius: 8px;
+  border: none; background: transparent; color: inherit; cursor: pointer;
+}
+.menu__item:hover{ background: color-mix(in oklab, var(--accent) 12%, transparent); }
+.menu__sep{ border: none; height: 1px; margin: 6px 0; background: var(--border); }
+
+/* le logo de marque n’est plus cliquable */
+.brand { cursor: default; user-select: none; }
+.brand svg { display:block; } 
