@@ -14,6 +14,8 @@ import articleRoutes from './routes/articles.js';
 import collectionRoutes from './routes/collections.js';
 import userRoutes from './routes/user.js';
 
+import previewRouter from './routes/preview.js';
+
 import cron from 'node-cron';
 import Feed from './models/Feed.js';
 import Article from './models/Article.js';
@@ -60,6 +62,8 @@ app.use('/api/feeds', feedRoutes);
 app.use('/api/articles', articleRoutes);
 app.use('/api/collections', collectionRoutes);
 app.use('/api/user', userRoutes);
+
+app.use('/api/preview', previewRouter);
 
 // ---- CRON simple horaire ----
 cron.schedule('0 * * * *', async () => {

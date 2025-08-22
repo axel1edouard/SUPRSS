@@ -18,23 +18,32 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const isPublic = 
+    location.pathname === '/' || 
+    location.pathname === '/login' || 
+    location.pathname === '/register';
+
+  const shouldFetchMe = !isPublic;  
+
   // Charger l'utilisateur au démarrage
   useEffect(() => {
-    let mounted = true;
-    api.get('/api/auth/me')
-      .then((r) => { if (mounted) setMe(extractUser(r)); })
-      .catch(() => { if (mounted) setMe(null); });
-    return () => { mounted = false; };
-  }, []);
+  let alive = true;
+  if (!shouldFetchMe) { setMe(null); return; }
+  api.get('/api/auth/me')
+    .then(r => { if (alive) setMe(extractUser(r)); })
+    .catch(() => { if (alive) setMe(null); });
+  return () => { alive = false; };
+}, []);
 
   // Recharger après chaque navigation (utile juste après le login)
   useEffect(() => {
-    let mounted = true;
-    api.get('/api/auth/me')
-      .then((r) => { if (mounted) setMe(extractUser(r)); })
-      .catch(() => { if (mounted) setMe(null); });
-    return () => { mounted = false; };
-  }, [location.pathname]);
+  let alive = true;
+  if (!shouldFetchMe) { setMe(null); return; }
+  api.get('/api/auth/me')
+    .then(r => { if (alive) setMe(extractUser(r)); })
+    .catch(() => { if (alive) setMe(null); });
+  return () => { alive = false; };
+}, [location.pathname]);
 
   // Appliquer automatiquement thème/zoom quand l'utilisateur est présent
   useEffect(() => {

@@ -33,6 +33,7 @@ export default function Home() {
         {/* Bouton centré */}
         <div className="home-hero__ctas">
           <Link className="btn btn--primary btn-lg" to="/login">Se connecter</Link>
+          <Link className="btn btn-lg" to="/register">Créer un compte</Link>
         </div>
       </div>
     </div>

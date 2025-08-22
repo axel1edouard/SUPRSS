@@ -3,6 +3,19 @@ import { useParams, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { toast } from '../lib/toast'
 
+const uniqById = (arr) => {
+  const seen = new Set();
+  const out = [];
+  for (const x of arr) {
+    const k = x._id || x.id;
+    if (!k || !seen.has(k)) {
+      if (k) seen.add(k);
+      out.push(x);
+    }
+  }
+  return out;
+};
+
 export default function CollectionView() {
   // --- HOOKS AU TOP-LEVEL ---
   const { id } = useParams()
@@ -46,18 +59,48 @@ export default function CollectionView() {
 
   // mémo owner / état
   const owner = useMemo(() => members.find(m => m.role === 'owner') || null, [members])
-  const amOwner = useMemo(() => !!(me && owner && String(owner._id) === String(me._id)), [me, owner])
-  const amMember = useMemo(() => !!(me && members.some(m => String(m._id) === String(me._id))), [me, members])
+  const amOwner = useMemo(() => {
+   if (!me) return false;
+   const meId = String(me._id || me.id || me.user?._id || '');
+   if (!meId) return false;
+   if (owner && String(owner._id) === meId) return true;
+   if (collection?.owner && String(collection.owner) === meId) return true; // fallback si la collection expose owner
+   const meAsMember = members.find(m => String(m._id) === meId);
+   return meAsMember?.role === 'owner' || meAsMember?.role === 'admin';
+ }, [me, owner, collection, members]);
+
+ const amMember = useMemo(() => {
+   if (!me) return false;
+   const meId = String(me._id || me.id || me.user?._id || '');
+   return members.some(m => String(m._id) === meId);
+ }, [me, members]);
 
   // loaders
-  const loadMe = async () => { try { const r = await api.get('/api/auth/me'); setMe(r.data) } catch {} }
+  const loadMe = async () => {
+   try {
+     const r = await api.get('/api/auth/me');
+     const u = r?.data?.user || r?.data;  
+     setMe(u || null);
+   } catch {
+     setMe(null);
+   }
+ }
   const loadCollection = async () => { const r = await api.get(`/api/collections/${id}`); setCollection(r.data) }
   const loadFeeds = async () => {
+  try {
+    // 1) route collection (la bonne pour owner ET membres)
+    const r = await api.get(`/api/collections/${id}/feeds`);
+    setFeeds(r.data || []);
+  } catch {
+    // 2) fallback historique si besoin
     try {
-      const r = await api.get('/api/feeds') // robuste: on filtre côté client
-      setFeeds((r.data || []).filter(f => f.collection && String(f.collection) === String(id)))
-    } catch { setFeeds([]) }
+      const r = await api.get('/api/feeds');
+      setFeeds((r.data || []).filter(f => f.collection && String(f.collection) === String(id)));
+    } catch {
+      setFeeds([]);
+    }
   }
+};
   const loadArticles = async () => {
     try {
       const p = new URLSearchParams()
@@ -85,7 +128,7 @@ export default function CollectionView() {
       const url = since ? `/api/collections/${id}/messages?since=${encodeURIComponent(since)}` : `/api/collections/${id}/messages`
       const r = await api.get(url)
       if (Array.isArray(r.data) && r.data.length) {
-        setChat(prev => [...prev, ...r.data])
+        setChat(prev => uniqById([...prev, ...r.data]));
         lastChatTsRef.current = r.data[r.data.length - 1].createdAt
       } else if (initial) {
         setChat([]); lastChatTsRef.current = null
@@ -97,7 +140,7 @@ export default function CollectionView() {
     const content = chatInput.trim()
     if (!content) return
     const r = await api.post(`/api/collections/${id}/messages`, { content })
-    setChat(prev => [...prev, r.data])
+    setChat(prev => uniqById([...prev, r.data]));
     lastChatTsRef.current = r.data.createdAt
     setChatInput('')
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 0)
