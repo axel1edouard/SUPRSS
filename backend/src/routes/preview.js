@@ -1,4 +1,3 @@
-// backend/src/routes/preview.js
 import { Router } from 'express';
 import * as cheerio from 'cheerio';
 import { URL as NodeURL } from 'node:url';
@@ -7,7 +6,6 @@ const router = Router();
 
 const abs = (u, base) => { try { return new NodeURL(u, base).toString(); } catch { return null; } };
 
-// --- OG image finder (déjà donné auparavant) ---
 router.get('/og-image', async (req, res) => {
   try {
     const pageUrl = String(req.query.url || '').trim();
@@ -43,15 +41,13 @@ router.get('/og-image', async (req, res) => {
   }
 });
 
-// --- NOUVEAU: proxy d'image ---
-// GET /api/preview/image?url=<imgUrl>&ref=<pageUrl optionnel>
+
 router.get('/image', async (req, res) => {
   try {
     const imgUrl = String(req.query.url || '').trim();
     if (!imgUrl) return res.status(400).end();
 
-    // Certains sites vérifient le Referer; on envoie l'origine de la page si fournie
-    const ref = String(req.query.ref || '').trim();
+        const ref = String(req.query.ref || '').trim();
     const referer = ref || new NodeURL(imgUrl).origin;
 
     const upstream = await fetch(imgUrl, {
@@ -69,8 +65,7 @@ router.get('/image', async (req, res) => {
     res.setHeader('Content-Type', ct);
     res.setHeader('Cache-Control', 'public, max-age=86400'); // 1 jour
 
-    // Stream direct pour éviter de bufferiser totalement l'image
-    const reader = upstream.body.getReader();
+        const reader = upstream.body.getReader();
     res.status(200);
     for (;;) {
       const { value, done } = await reader.read();

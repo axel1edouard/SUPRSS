@@ -6,9 +6,9 @@ export async function requireAuth(req, res, next) {
     // 1) récupérer le token depuis plusieurs emplacements
     const cookies = req.cookies || {}
     let token =
-      cookies.token ||           // notre nouveau cookie
-      cookies.auth ||            // ancien nom possible
-      cookies.jwt || null        // autre nom possible
+      cookies.token ||           
+      cookies.auth ||            
+      cookies.jwt || null        
 
     if (!token) {
       const hdr = req.headers.authorization || ''

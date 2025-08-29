@@ -53,7 +53,6 @@ export async function refreshFeed(feedOrId) {
       lastModified: feed.lastModified
     });
 
-    // upsert des items (dédup guid/link + feed)
     const items = (meta.items || []).slice(0, 100);
     for (const it of items) {
       const guid = it.guid || it.link || (it.title + (feed._id.toString()));

@@ -1,7 +1,6 @@
-// backend/src/routes/oauth.js
 import { Router } from 'express';
 import passport from 'passport';
-import './passport-google.js'; // enregistre la stratégie "google"
+import './passport-google.js'; 
 import User from '../models/User.js';
 import { setAuthCookie } from '../utils/setAuthCookie.js';
 
@@ -49,8 +48,7 @@ router.get(
         return res.redirect(FRONT + '/login?error=noemail');
       }
 
-      // Nom lisible : displayName ou "prenom nom" ou la partie avant @
-      const displayName =
+            const displayName =
         profile?.displayName ||
         [profile?.name?.givenName, profile?.name?.familyName]
           .filter(Boolean)
@@ -75,15 +73,15 @@ router.get(
         user = await User.create({
           email,
           name: displayName,
-          passwordHash: null, // autorisé par le schéma (required conditionnel)
+          passwordHash: null, 
           googleId,
         });
       }
 
-      // Émettre le cookie JWT (compatible localhost)
+    
       setAuthCookie(res, user);
 
-      // Réponse HTML (au lieu d'un 302) pour fiabiliser la pose du cookie
+      
       res.set('Content-Type', 'text/html; charset=utf-8');
       return res.send(
         `

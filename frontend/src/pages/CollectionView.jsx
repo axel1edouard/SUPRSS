@@ -64,7 +64,7 @@ export default function CollectionView() {
    const meId = String(me._id || me.id || me.user?._id || '');
    if (!meId) return false;
    if (owner && String(owner._id) === meId) return true;
-   if (collection?.owner && String(collection.owner) === meId) return true; // fallback si la collection expose owner
+   if (collection?.owner && String(collection.owner) === meId) return true; 
    const meAsMember = members.find(m => String(m._id) === meId);
    return meAsMember?.role === 'owner' || meAsMember?.role === 'admin';
  }, [me, owner, collection, members]);
@@ -88,11 +88,11 @@ export default function CollectionView() {
   const loadCollection = async () => { const r = await api.get(`/api/collections/${id}`); setCollection(r.data) }
   const loadFeeds = async () => {
   try {
-    // 1) route collection (la bonne pour owner ET membres)
+   
     const r = await api.get(`/api/collections/${id}/feeds`);
     setFeeds(r.data || []);
   } catch {
-    // 2) fallback historique si besoin
+    
     try {
       const r = await api.get('/api/feeds');
       setFeeds((r.data || []).filter(f => f.collection && String(f.collection) === String(id)));
@@ -192,7 +192,7 @@ export default function CollectionView() {
     loadChat(true)
     const int = setInterval(() => loadChat(false), 4000)
     return () => clearInterval(int)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [id])
 
   // actions

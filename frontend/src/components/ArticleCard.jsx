@@ -1,14 +1,11 @@
-// frontend/src/components/ArticleCard.jsx
 import { useEffect, useMemo, useState } from 'react';
 import api from '../lib/api';
 
-/* --- helpers --- */
 
 // Essaie d'extraire une image depuis les champs RSS courants
 function pickImageFromRss(a) {
   if (!a) return null;
 
-  // Structure "maison"
   if (a.imageUrl) return a.imageUrl;
   if (a.image?.url) return a.image.url;
   if (typeof a.image === 'string') return a.image;
@@ -85,7 +82,6 @@ export default function ArticleCard(props) {
     };
   }, [href, initialGuess]);
 
-  // Toujours passer par le proxy d'image côté backend (évite hotlink/403/HTML)
   const apiBase = (api?.defaults?.baseURL || '').replace(/\/$/, '');
   const proxiedSrc = imgUrl
     ? `${apiBase}/api/preview/image?url=${encodeURIComponent(imgUrl)}&ref=${encodeURIComponent(href)}`

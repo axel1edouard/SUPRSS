@@ -1,4 +1,3 @@
-// backend/src/models/User.js
 import mongoose from 'mongoose';
 const { Schema } = mongoose;
 
@@ -13,7 +12,7 @@ const UserSchema = new Schema(
       trim: true,
     },
 
-    // Nom facultatif (on peut le remplir via Google)
+    
     name: { type: String, default: '' },
 
     // Hash de mot de passe requis SEULEMENT si pas d'OAuth
@@ -31,7 +30,7 @@ const UserSchema = new Schema(
       type: String,
       default: null,
       unique: true,
-      sparse: true, // permet plusieurs docs sans googleId
+      sparse: true, 
       index: true,
     },
 

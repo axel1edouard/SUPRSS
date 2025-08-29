@@ -12,7 +12,6 @@ function escapeXml(s='') {
   return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// Create a feed and ingest articles
 router.post('/', requireAuth, async (req, res) => {
   try {
     const { url, title, description, tags, updateFrequency, status, collectionId } = req.body;
@@ -50,7 +49,6 @@ router.post('/', requireAuth, async (req, res) => {
   }
 });
 
-// List feeds (optionally by collection)
 router.get('/', requireAuth, async (req, res) => {
   const { collectionId } = req.query;
   const query = { owner: req.user.id };
@@ -59,7 +57,6 @@ router.get('/', requireAuth, async (req, res) => {
   res.json(feeds);
 });
 
-// Update feed (status, frequency, title, tags, detach/attach collection)
 router.patch('/:id', requireAuth, async (req, res) => {
   const feed = await Feed.findOne({ _id: req.params.id, owner: req.user.id });
   if (!feed) return res.status(404).json({ error: 'Not found' });
@@ -85,7 +82,6 @@ router.post('/:id/refresh', requireAuth, async (req, res) => {
   res.json({ ...result, feed: fresh });
 });
 
-// Delete feed and its articles
 router.delete('/:id', requireAuth, async (req, res) => {
   const feed = await Feed.findOne({ _id: req.params.id, owner: req.user.id });
   if (!feed) return res.status(404).json({ error: 'Not found' });

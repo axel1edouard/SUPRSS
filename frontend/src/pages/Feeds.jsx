@@ -13,7 +13,7 @@ export default function Feeds() {
   const [url, setUrl] = useState('');
   const [statusNew, setStatusNew] = useState('active');   // active | inactive
   const [freqNew, setFreqNew] = useState('hourly');       // hourly | 6h | daily
-  const [tagsNew, setTagsNew] = useState('');             // CSV -> array
+  const [tagsNew, setTagsNew] = useState('');             // CSV
 
   // --- filtres & recherche ---
   const [q, setQ] = useState('');
@@ -32,7 +32,7 @@ export default function Feeds() {
   const firstImgFromHTML = (html) => {
     if (!html) return null;
     const s = String(html);
-    // src=… ou data-src=…
+    
     const m = s.match(/<img[^>]+(?:data-src|src)=["']([^"']+)["']/i);
     return m ? m[1] : null;
   };
@@ -75,7 +75,7 @@ export default function Feeds() {
       source,
       publishedAt,
       tags,
-      _raw: a, // on garde l’objet brut pour les actions (lu/fav)
+      _raw: a, 
     };
   };
 

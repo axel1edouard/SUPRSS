@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 const baseURL =
-  import.meta.env.VITE_API_URL ||         // compat avec l'ancien nom
-  import.meta.env.VITE_API_BASE ||        // ton nom actuel
+  import.meta.env.VITE_API_URL ||         
+  import.meta.env.VITE_API_BASE ||        
   'http://localhost:4000';
 
 const api = axios.create({
@@ -15,7 +15,7 @@ api.interceptors.response.use(
   (error) => {
     const status = error?.response?.status;
     const { pathname, search, hash } = window.location;
-    // Pages publiques (pas de redirection auto sur 401)
+    
     const isPublic =
       pathname === '/' ||
       pathname === '/login' ||
@@ -26,9 +26,9 @@ api.interceptors.response.use(
       // Garde le chemin pour revenir après login
       const next = encodeURIComponent(pathname + search + hash);
       window.location.assign(`/login?next=${next}`);
-      // (si ton Login lit aussi location.state.from, ça marchera quand même)
+      
     }
-    // Optionnel: gestion 403, 5xx, network errors…
+   
     return Promise.reject(error);
   }
 );

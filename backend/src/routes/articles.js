@@ -5,7 +5,6 @@ import Feed from '../models/Feed.js';
 
 const router = Router();
 
-// Query: feedId?, collectionId?, status(read|unread)?, favorite(true)? q?, tags? (CSV), limit?
 router.get('/', requireAuth, async (req, res) => {
   const { feedId, collectionId, status, favorite, q, tags, limit = 50 } = req.query;
 
@@ -53,7 +52,6 @@ router.get('/', requireAuth, async (req, res) => {
     return { ...a, isRead, isFavorite };
   });
 
-  // read/unread
   if (status === 'read') {
     articles = articles.filter(a => a.isRead);
   } else if (status === 'unread') {

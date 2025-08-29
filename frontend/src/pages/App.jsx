@@ -1,12 +1,10 @@
-// frontend/src/pages/App.jsx
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import api from '../lib/api';
 import { loadAndApplyPrefs } from '../lib/prefs';
 import { ButterflyLogo } from '../components/Logo';
 
-function extractUser(resp) {
-  // tolère de nombreuses formes: {user:{...}} ou {...} direct
+function extractUser(resp) { 
   const d = resp?.data;
   const u = d?.user ?? d ?? null;
   const has = u && (u.id || u._id || u.email || u.username || u.name);
@@ -63,7 +61,7 @@ export default function App() {
     navigate('/login', { replace: true });
   };
 
-  // Cacher la barre sur Home + Login (+ Register si tu en as une)
+  // Cacher la barre sur Home + Login + Register 
   const hideHeader = ['/', '/login', '/register'].includes(location.pathname);
 
   return (

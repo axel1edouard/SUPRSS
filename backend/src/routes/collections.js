@@ -99,7 +99,6 @@ router.delete('/:id/feeds/:feedId', requireAuth, async (req, res) => {
 });
 
 /* -------------------- Articles agrégés -------------------- */
-// Supporte feedId, q, status(read|unread), favorite(true), tags (CSV), limit
 router.get('/:id/articles', requireAuth, async (req, res) => {
   const col = await ensureMember(req.params.id, req.user.id);
   if (!col) return res.status(404).json({ error: 'Not found' });
@@ -147,7 +146,6 @@ router.get('/:id/articles', requireAuth, async (req, res) => {
 
 /* -------------------- Messagerie de collection (article = null) -------------------- */
 
-// GET messages (polling): ?since=<ISO|ms>&limit=50
 router.get('/:id/messages', requireAuth, async (req, res) => {
   const col = await ensureMember(req.params.id, req.user.id);
   if (!col) return res.status(404).json({ error: 'Not found' });
@@ -186,7 +184,6 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
 
 /* -------------------- Commentaires d’un article (dans une collection) -------------------- */
 
-// helper: vérifie que l’article appartient à un feed de la collection
 async function ensureArticleInCollection(articleId, collectionId) {
   const art = await Article.findById(articleId).select('feed');
   if (!art) return null;
@@ -195,7 +192,6 @@ async function ensureArticleInCollection(articleId, collectionId) {
   return String(feed.collection) === String(collectionId) ? art : null;
 }
 
-// GET comments d’un article : ?since=&limit=
 router.get('/:id/articles/:articleId/comments', requireAuth, async (req, res) => {
   const col = await ensureMember(req.params.id, req.user.id);
   if (!col) return res.status(404).json({ error: 'Not found' });

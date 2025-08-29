@@ -35,7 +35,7 @@ export default function AcceptInvite() {
   const accept = async () => {
   setBusy(true); setErr('');
   try {
-    // ⚠️ utiliser la route réelle du back :
+    
     const r = await api.post(`/api/collections/invitations/${encodeURIComponent(token)}/accept`);
     const cid = r?.data?.collectionId;
     localStorage.removeItem('suprss_pending_invite');

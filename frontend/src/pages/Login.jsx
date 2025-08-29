@@ -36,7 +36,7 @@ export default function Login() {
   };
 
   const continueWithGoogle = () => {
-    // Redirige vers l'endpoint OAuth de ton backend
+    // Redirige vers l'endpoint OAuth 
     const base = api.defaults.baseURL?.replace(/\/$/, '') || '';
     window.location.assign(`${base}/api/auth/google`);
   };

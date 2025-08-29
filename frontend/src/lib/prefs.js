@@ -1,5 +1,4 @@
-// frontend/src/lib/prefs.js
-import api from '../lib/api'; // ajuste si ton client API est ailleurs
+import api from '../lib/api'; 
 
 const KEY = 'suprss_theme';
 const norm = (t) => (t === 'dark' ? 'dark' : 'light');
@@ -13,8 +12,7 @@ function applyFontScale(fontScale) {
   const fs = clampScale(fontScale);
   const html = document.documentElement;
   html.style.setProperty('--font-scale', String(fs));
-  // Optionnel (effet immédiat même sans CSS global) :
-  // html.style.fontSize = `${16 * fs}px`;
+
   return fs;
 }
 
@@ -24,8 +22,8 @@ export function applyPrefs({ theme = 'light', fontScale = 1 } = {}) {
 
   const html = document.documentElement;
   const body = document.body;
-  html.dataset.theme = t;                         // compatible avec index.css
-  html.classList.toggle('dark', t === 'dark');    // utile si Tailwind 'class'
+  html.dataset.theme = t;                         
+  html.classList.toggle('dark', t === 'dark');    
   body?.classList?.toggle?.('dark', t === 'dark');
 
   try { localStorage.setItem(KEY, t); } catch {}
@@ -41,7 +39,7 @@ export async function loadAndApplyPrefs() {
       fontScale: data.fontScale ?? 1,
     });
   } catch {
-    // Fallback local (évite l’effet “tous les comptes” si tu ajoutes le reset au logout)
+    
     let saved = null;
     try { saved = localStorage.getItem(KEY); } catch {}
     return applyPrefs({ theme: saved ?? 'light', fontScale: 1 });
@@ -53,19 +51,19 @@ export async function savePrefs(prefs) {
     theme: norm(prefs?.theme),
     fontScale: clampScale(prefs?.fontScale ?? 1),
   };
-  // Tente PATCH
+  
   try {
     const r = await api.patch('/api/user/prefs', payload);
     const data = r?.data?.prefs ?? r?.data ?? payload;
     return applyPrefs({ theme: data.theme, fontScale: data.fontScale });
   } catch {
-    // Fallback POST
+    
     try {
       const r = await api.post('/api/user/prefs', payload);
       const data = r?.data?.prefs ?? r?.data ?? payload;
       return applyPrefs({ theme: data.theme, fontScale: data.fontScale });
     } catch {
-      // En dernier recours, applique localement
+      
       return applyPrefs(payload);
     }
   }

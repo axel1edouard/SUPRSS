@@ -115,10 +115,10 @@ ul.cards>li{
 .home-hero__ctas{ display:flex; justify-content:center; gap:12px; margin-top: 8px; }
 .home-hero__credit{ margin: 6px 0 18px; color: var(--muted); font-size: 14px; }
 
-/* Bouton plus généreux pour le hero */
+/* Bouton pour le hero */
 .btn-lg{ padding: 12px 20px; font-size: 16px; border-radius: 12px; }
 
-/* (Déjà en place, rappel) le hero a un fond bleu léger, compatible clair/sombre */
+/* le hero a un fond bleu léger, compatible clair/sombre */
 
 .btn{ padding: 10px 16px; border-radius: 10px; border:1px solid var(--border); }
 .btn--primary{ background: var(--accent); color: #fff; border-color: transparent; box-shadow: var(--shadow-sm); }
@@ -186,6 +186,6 @@ ul.cards>li{
 .menu__item:hover{ background: color-mix(in oklab, var(--accent) 12%, transparent); }
 .menu__sep{ border: none; height: 1px; margin: 6px 0; background: var(--border); }
 
-/* le logo de marque n’est plus cliquable */
+/* le logo n’est pas cliquable */
 .brand { cursor: default; user-select: none; }
 .brand svg { display:block; } 
