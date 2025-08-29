@@ -1,3 +1,24 @@
-node_modules
-dist
-.vite
+# deps & builds
+**/node_modules/
+**/dist/
+**/build/
+
+# env & secrets
+.env
+*.env
+*.env.*            # .env.local, etc.
+
+# logs & caches
+**/*.log
+**/.cache/
+**/.vercel/
+**/.next/
+
+# system files
+.DS_Store
+Thumbs.db
+
+# git / editor
+.git/
+.vscode/
+.idea/
